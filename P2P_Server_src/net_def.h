@@ -222,7 +222,7 @@ struct stCommMsg
     unsigned int uiMsgType;				// 客户端和服务器通信的类型
     unsigned int result;  //0:success 1:failed
     char cMyName[MAX_NAME_SIZE];		// 本客户端自己的名字	
-    char  cToName[MAX_NAME_SIZE];		// 想要p2p 通信的 客户端名字
+    char cToName[MAX_NAME_SIZE];		// 想要p2p 通信的 客户端名字
 
     stTransMsg  	transMsg;			// 服务器转发的 
     stP2PMsg		p2pMsg;				// 客户端之间的p2p通信
@@ -240,6 +240,12 @@ struct stCommMsg
 
 using namespace std;
 typedef list<stUserListNode*> UserList;
+
+typedef struct
+{
+	unsigned char bLogin;
+	char sMyName[MAX_NAME_SIZE];	
+} st_Peer;
 #endif
 
 #endif

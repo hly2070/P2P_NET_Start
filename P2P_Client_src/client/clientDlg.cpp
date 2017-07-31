@@ -56,6 +56,7 @@ CclientDlg::CclientDlg(CWnd* pParent /*=NULL*/)
 	, h_recv(NULL)
 	, bConnect(FALSE)
 	, bRelay(FALSE)
+	, bLogin(FALSE)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 //	memset(cliIpAddr, NULL, sizeof(char));
@@ -221,12 +222,20 @@ DWORD thread_heart_proc(LPVOID arg)
 
 	while(1)
 	{
-		p_dlg->GetUserList();
-		Sleep(500);
+		if(!p_dlg->bLogin)
+		{
+			TerminateThread(p_dlg->h_recv, 0);
+			p_dlg->h_recv = NULL;
+			break;
+		}
+		else
+		{
+			p_dlg->GetUserList();
+			Sleep(500);
+		}
 	}
-	
-///	TerminateThread(this, 0);
-//	h_recv = NULL;
+		
+	return 0;
 }
 
 DWORD WINAPI thread_recv_proc(LPVOID arg)
@@ -254,6 +263,7 @@ DWORD WINAPI thread_recv_proc(LPVOID arg)
 			{
 				if (recvbuf->result == 0)
 				{
+					p_dlg->bLogin = TRUE;
 					p_dlg->UpdateCtrlStates(); //update button states
 				}
 				else
@@ -403,6 +413,14 @@ DWORD WINAPI thread_recv_proc(LPVOID arg)
 					AfxMessageBox("Recv Message Error!");
 				else
 				{
+					stUserListNode fromPeer = p_dlg->GetLocalUser(recvbuf->cMyName);
+				//	AfxMessageBox(CString(recvmessage));
+					
+					sockaddr_in fromAddr;
+					fromAddr.sin_family = AF_INET;
+					fromAddr.sin_port = htons(fromPeer.usPORT);
+					fromAddr.sin_addr.s_addr = htonl(fromPeer.uiIP);
+					
 					CString str;
 					p_dlg->GetDlgItem(IDC_EDIT_RECV)->GetWindowText(str);
 					if (!str.IsEmpty())
@@ -410,8 +428,9 @@ DWORD WINAPI thread_recv_proc(LPVOID arg)
 
 					CString strTmp;
 					in_addr tmp;
-					tmp.S_un.S_addr = remote.sin_addr.S_un.S_addr;
-					strTmp.Format("%s (%s) say : \r\n  %s", recvbuf->p2pMsg.cP2PCommUserName, inet_ntoa(tmp), recvmessage);
+					tmp.S_un.S_addr = fromAddr.sin_addr.S_un.S_addr;
+					strTmp.Format("%s (%s) say : \r\n  %s", recvbuf->p2pMsg.cP2PCommUserName, inet_ntoa(tmp), 
+						recvmessage);
 					strTmp += "\r\n";
 					str += strTmp;
 					p_dlg->GetDlgItem(IDC_EDIT_RECV)->SetWindowText(str);
@@ -441,7 +460,8 @@ DWORD WINAPI thread_recv_proc(LPVOID arg)
 				peerCli.sin_addr.S_un.S_addr = htonl(recvbuf->transMsg.uiIP);
 
 				CString strTmp;
-				strTmp.Format("%s[%s:%d] want to connect to you.", recvbuf->transMsg.userName, inet_ntoa(peerCli.sin_addr), htons(peerCli.sin_port));
+				strTmp.Format("%s[%s:%d] want to connect to you.", recvbuf->transMsg.userName, 
+					inet_ntoa(peerCli.sin_addr), htons(peerCli.sin_port));
 				str += strTmp;
 				p_dlg->GetDlgItem(IDC_EDIT_LOG)->SetWindowText(str);
 				p_dlg->m_EditInfo.LineScroll(p_dlg->m_EditInfo.GetLineCount(), 0);	//自动滚动到最后一行
@@ -454,7 +474,8 @@ DWORD WINAPI thread_recv_proc(LPVOID arg)
 				//UDP hole punching
 				stCommMsg holeMessage;
 				holeMessage.uiMsgType = P2PPUNCH;
-				sendto(p_dlg->m_cliSocket, (const char*)&holeMessage, sizeof(holeMessage), 0, (const sockaddr*)&peerCli, sizeof(peerCli));
+				sendto(p_dlg->m_cliSocket, (const char*)&holeMessage, sizeof(holeMessage), 0, 
+					(const sockaddr*)&peerCli, sizeof(peerCli));
 
 				Sleep(500);
 
@@ -463,7 +484,8 @@ DWORD WINAPI thread_recv_proc(LPVOID arg)
 				strcpy(sendbuf.cMyName, p_dlg->m_strMyID.GetBuffer());
 				strcpy(sendbuf.cToName, p_dlg->m_strToID.GetBuffer());
 
-				sendto(p_dlg->m_cliSocket, (const char*)&sendbuf, sendbuf.getSize(), 0, (const sockaddr*)&p_dlg->remoteAddr, sizeof(p_dlg->remoteAddr));
+				sendto(p_dlg->m_cliSocket, (const char*)&sendbuf, sendbuf.getSize(), 0, 
+					(const sockaddr*)&p_dlg->remoteAddr, sizeof(p_dlg->remoteAddr));
 
 				//block
 			/*	ul = 0;
@@ -481,7 +503,8 @@ DWORD WINAPI thread_recv_proc(LPVOID arg)
 				p_dlg->GetDlgItem(IDC_EDIT_LOG)->GetWindowText(str);
 				if (!str.IsEmpty())
 					str += "\r\n";
-				strTmp.Format("connected %s(%s:%d) by P2P", recvbuf->cMyName, inet_ntoa(remote.sin_addr), htons(remote.sin_port));
+				strTmp.Format("connected %s(%s:%d) by P2P", recvbuf->cMyName, inet_ntoa(remote.sin_addr), 
+					htons(remote.sin_port));
 				str += strTmp;
 				p_dlg->GetDlgItem(IDC_EDIT_LOG)->SetWindowText(str);
 				p_dlg->m_EditInfo.LineScroll(p_dlg->m_EditInfo.GetLineCount(), 0);	//自动滚动到最后一行
@@ -510,7 +533,8 @@ DWORD WINAPI thread_recv_proc(LPVOID arg)
 
 				stCommMsg mTransMsg;
 				mTransMsg.uiMsgType = P2PPUNCH2;
-				sendto(p_dlg->m_cliSocket, (const char*)&mTransMsg, sizeof(stCommMsg), 0, (const sockaddr*)&remotePeer, sizeof(remotePeer));
+				sendto(p_dlg->m_cliSocket, (const char*)&mTransMsg, sizeof(stCommMsg), 0, 
+					(const sockaddr*)&remotePeer, sizeof(remotePeer));
 
 				p_dlg->SetTimer(1, 2000, 0);
 
@@ -521,7 +545,8 @@ DWORD WINAPI thread_recv_proc(LPVOID arg)
 			{
 				stCommMsg mTransMsg;
 				mTransMsg.uiMsgType = P2PPUNCHOK;
-				sendto(p_dlg->m_cliSocket, (const char*)&mTransMsg, sizeof(stCommMsg), 0, (const sockaddr*)&remote, sizeof(remote));
+				sendto(p_dlg->m_cliSocket, (const char*)&mTransMsg, sizeof(stCommMsg), 0, 
+					(const sockaddr*)&remote, sizeof(remote));
 				break;
 			}
 
@@ -583,6 +608,7 @@ void CclientDlg::OnBnClickedBtnDisconnect()
 	GetDlgItem(IDC_BTN_GET_USERS)->EnableWindow(FALSE);
 
 	GetDlgItem(IDC_EDIT_LOG)->SetWindowTextA("");
+	bLogin = TRUE;
 }
 
 void CclientDlg::GetLocalIpAddr()
@@ -606,7 +632,10 @@ void CclientDlg::OnDestroy()
 	CDialog::OnDestroy();
 
 	// TODO: 在此处添加消息处理程序代码
-	OnBnClickedBtnDisconnect();
+	if(bLogin)
+	{
+		OnBnClickedBtnDisconnect();
+	}
 
 	//release something...
 	if(h_recv != NULL)
@@ -750,10 +779,12 @@ void CclientDlg::OnBnClickedBtnSend()
 
 	m_EditRecv.LineScroll(m_EditRecv.GetLineCount(), 0);	//自动滚动到最后一行
 
+	strcpy(message, strMsg.GetBuffer());
+	
 	if (!bRelay)
 	{
 		//start to send message.
-		strcpy(message, strMsg.GetBuffer());
+	//	strcpy(message, strMsg.GetBuffer());
 		char userName[15];
 		strcpy(userName, m_strToID.GetBuffer());
 
@@ -816,8 +847,6 @@ void CclientDlg::OnBnClickedBtnSend()
 	}
 	else
 	{
-	//	MessageBox("send relay message");
-
 		stCommMsg MessageHead;
 		MessageHead.uiMsgType = RELAYMESSAGE;
 		strcpy(MessageHead.cMyName, m_strMyID.GetBuffer());
@@ -828,9 +857,11 @@ void CclientDlg::OnBnClickedBtnSend()
 	//	GetDlgItem(IDC_EDIT_SEND)->SetWindowText("");
 
 		//发送p2p消息头
-		int send_count = sendto(m_cliSocket, (const char*)&MessageHead, sizeof(MessageHead), 0, (const sockaddr*)&remoteAddr, sizeof(remoteAddr));
+		int send_count = sendto(m_cliSocket, (const char*)&MessageHead, sizeof(MessageHead), 0, 
+		(const sockaddr*)&remoteAddr, sizeof(remoteAddr));
 		//发送p2p消息体
-		send_count = sendto(m_cliSocket, (const char*)&message, MessageHead.p2pMsg.uiSendLen, 0, (const sockaddr*)&remoteAddr, sizeof(remoteAddr));
+		send_count = sendto(m_cliSocket, (const char*)&message, MessageHead.p2pMsg.uiSendLen, 0, 
+		(const sockaddr*)&remoteAddr, sizeof(remoteAddr));
 	}
 }
 
