@@ -404,40 +404,50 @@ DWORD WINAPI thread_recv_proc(LPVOID arg)
 
 			case RELAYMESSAGE2:
 			{
-				p_dlg->bRelay = TRUE;
-
-				char *recvmessage = new char[recvbuf->p2pMsg.uiSendLen];
-				int recv = recvfrom(p_dlg->m_cliSocket, recvmessage, MAX_PACKET_SIZE, 0, (sockaddr*)&remote, &nLen);
-				recvmessage[recv - 1] = '\0';
-				if (recv <= 0)
-					AfxMessageBox("Recv Message Error!");
-				else
+				if(recvbuf->rlyMsg.uiSendLen > 0)
 				{
-					stUserListNode fromPeer = p_dlg->GetLocalUser(recvbuf->cMyName);
+					char *recvmessage = new char[recvbuf->rlyMsg.uiSendLen];
+					int recv = recvfrom(p_dlg->m_cliSocket, recvmessage, MAX_PACKET_SIZE, 0, (sockaddr*)&remote, &nLen);
+					recvmessage[recv - 1] = '\0';
 				//	AfxMessageBox(CString(recvmessage));
-					
-					sockaddr_in fromAddr;
-					fromAddr.sin_family = AF_INET;
-					fromAddr.sin_port = htons(fromPeer.usPORT);
-					fromAddr.sin_addr.s_addr = htonl(fromPeer.uiIP);
-					
-					CString str;
-					p_dlg->GetDlgItem(IDC_EDIT_RECV)->GetWindowText(str);
-					if (!str.IsEmpty())
-						str += "\r\n";
+					if (recv <= 0)
+						AfxMessageBox("Recv Message Error!");
+					else
+					{
+						if(recvbuf->rlyMsg.uiSendLen == recv)
+						{
+							char message[256];
+							strcpy(message, recvmessage);
+						//	AfxMessageBox(CString(message));
+							
+							stUserListNode fromPeer = p_dlg->GetLocalUser(recvbuf->cMyName);
+						//	AfxMessageBox(CString(recvmessage));
+							
+							sockaddr_in fromAddr;
+							fromAddr.sin_family = AF_INET;
+							fromAddr.sin_port = htons(fromPeer.usPORT);
+							fromAddr.sin_addr.s_addr = htonl(fromPeer.uiIP);
+							
+							CString str;
+							p_dlg->GetDlgItem(IDC_EDIT_RECV)->GetWindowText(str);
+							if (!str.IsEmpty())
+								str += "\r\n";
 
-					CString strTmp;
-					in_addr tmp;
-					tmp.S_un.S_addr = fromAddr.sin_addr.S_un.S_addr;
-					strTmp.Format("%s (%s) say : \r\n  %s", recvbuf->p2pMsg.cP2PCommUserName, inet_ntoa(tmp), 
-						recvmessage);
-					strTmp += "\r\n";
-					str += strTmp;
-					p_dlg->GetDlgItem(IDC_EDIT_RECV)->SetWindowText(str);
+							CString strTmp;
+							in_addr tmp;
+							tmp.S_un.S_addr = fromAddr.sin_addr.S_un.S_addr;
+							strTmp.Format("%s (%s) say : \r\n  %s", recvbuf->rlyMsg.sUserName, inet_ntoa(tmp), 
+								message);
+							strTmp += "\r\n";
+							str += strTmp;
+							p_dlg->GetDlgItem(IDC_EDIT_RECV)->SetWindowText(str);
 
-					p_dlg->m_EditRecv.LineScroll(p_dlg->m_EditRecv.GetLineCount(), 0);
+							p_dlg->m_EditRecv.LineScroll(p_dlg->m_EditRecv.GetLineCount(), 0);
+						}
+					}
+					delete[]recvmessage;
 				}
-				delete[]recvmessage;
+				
 				break;
 			}
 
@@ -851,16 +861,17 @@ void CclientDlg::OnBnClickedBtnSend()
 		MessageHead.uiMsgType = RELAYMESSAGE;
 		strcpy(MessageHead.cMyName, m_strMyID.GetBuffer());
 		strcpy(MessageHead.cToName, m_strToID.GetBuffer());
-		MessageHead.p2pMsg.uiSendLen = (int)strlen(message) + 1;
-		strcpy(MessageHead.p2pMsg.cP2PCommUserName, m_strMyID.GetBuffer(m_strMyID.GetLength()));
+		MessageHead.rlyMsg.uiSendLen = (int)strlen(message)+1;
+		strcpy(MessageHead.rlyMsg.sUserName, m_strMyID.GetBuffer(m_strMyID.GetLength()));
 
-	//	GetDlgItem(IDC_EDIT_SEND)->SetWindowText("");
+		GetDlgItem(IDC_EDIT_SEND)->SetWindowText("");
 
 		//发送p2p消息头
 		int send_count = sendto(m_cliSocket, (const char*)&MessageHead, sizeof(MessageHead), 0, 
 		(const sockaddr*)&remoteAddr, sizeof(remoteAddr));
+		
 		//发送p2p消息体
-		send_count = sendto(m_cliSocket, (const char*)&message, MessageHead.p2pMsg.uiSendLen, 0, 
+		send_count = sendto(m_cliSocket, (const char*)&message, MessageHead.rlyMsg.uiSendLen, 0, 
 		(const sockaddr*)&remoteAddr, sizeof(remoteAddr));
 	}
 }

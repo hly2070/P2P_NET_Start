@@ -191,6 +191,18 @@ struct stP2PMsg
 	}
 };
 
+//relay message
+struct stRelayMsg
+{
+	unsigned int uiSendLen; //message lenght.
+	char sUserName[MAX_NAME_SIZE];
+
+	stRelayMsg()
+	{
+		memset(this, 0, sizeof(*this));
+	}
+};
+
 //通用消息格式
 struct stCommMsg
 {
@@ -200,7 +212,11 @@ struct stCommMsg
 	char  cToName[MAX_NAME_SIZE];		// 想要p2p 通信的 客户端名字
 
 	stTransMsg  	transMsg;			// 服务器转发的 
-	stP2PMsg		p2pMsg;				// 客户端之间的p2p通信
+//	union
+//    {
+    	stP2PMsg		p2pMsg;				// 客户端之间的p2p通信
+    	stRelayMsg		rlyMsg;			//relay message.
+//    };
 
 	unsigned int   userNums;			// 全部的客户端数量
 	stUserListNode userList[0];			//用于server向客户端发送客户列表

@@ -81,6 +81,8 @@ void removeUser(const char *userName)
 
 void *p2p_srvProc(void *arg)
 {
+	pthread_detach(pthread_self());
+	
 	sockaddr_in sender;
 	char buf[MAX_PACKET_SIZE] = {0};
 
@@ -158,6 +160,7 @@ void *p2p_srvProc(void *arg)
 						
 						break;
 					}
+				
 				case MSG_LOGOUT_REQ:
 					{
 						std::cout << "has a client logout, name:" << mRecvMsg->cMyName << std::endl;
@@ -286,8 +289,24 @@ void *p2p_srvProc(void *arg)
 
 				case RELAYMESSAGE:
 				{
-					char *recvmessage = new char[mRecvMsg->p2pMsg.uiSendLen];
+					stUserListNode toPeer = GetUser(mRecvMsg->cToName);
+
+					sockaddr_in remote;
+					remote.sin_family = AF_INET;
+					remote.sin_port = htons(toPeer.usPORT);
+					remote.sin_addr.s_addr = htonl(toPeer.uiIP);
+					
+					stCommMsg MessageHead;
+					MessageHead.uiMsgType = RELAYMESSAGE2;
+					strcpy(MessageHead.cMyName, mRecvMsg->cMyName);
+					strcpy(MessageHead.cToName, mRecvMsg->cToName);
+				//	MessageHead.p2pMsg.uiSendLen = (int)strlen(recvmessage)+1;
+				//	strcpy(MessageHead.p2pMsg.cP2PCommUserName, mRecvMsg->cMyName);
+					printf("%s -> %s, %d\n", mRecvMsg->cMyName, mRecvMsg->cToName, mRecvMsg->rlyMsg.uiSendLen);
+						
+					char *recvmessage = new char[mRecvMsg->rlyMsg.uiSendLen];
 					int recv = recvfrom(sockSrv, recvmessage, MAX_PACKET_SIZE, 0, (sockaddr*)&sender, &nLen);
+					printf("\r\nrecv data len = %d\r\n", recv);
 					recvmessage[recv - 1] = '\0';
 					if (recv <= 0)
 					{
@@ -295,31 +314,27 @@ void *p2p_srvProc(void *arg)
 					}
 					else
 					{
-						stUserListNode toPeer = GetUser(mRecvMsg->cToName);
-						printf("recv relay message : %s from : %s to : %s\n", recvmessage, mRecvMsg->cMyName, 
+						if(mRecvMsg->rlyMsg.uiSendLen == recv)
+						{
+							MessageHead.rlyMsg.uiSendLen = (int)strlen(recvmessage)+1;
+							strcpy(MessageHead.rlyMsg.sUserName, mRecvMsg->cMyName);
+							
+							//∑¢ÀÕp2pœ˚œ¢Õ∑
+							int send_count = sendto(sockSrv, (const char*)&MessageHead, sizeof(MessageHead), 0, 
+							(const sockaddr*)&remote, sizeof(remote));
+
+							printf("recv relay message : %s from : %s to : %s\n", recvmessage, mRecvMsg->cMyName, 
 							mRecvMsg->cToName);
-
-						sockaddr_in remote;
-						remote.sin_family = AF_INET;
-						remote.sin_port = htons(toPeer.usPORT);
-						remote.sin_addr.s_addr = htonl(toPeer.uiIP);
-						
-						stCommMsg MessageHead;
-						MessageHead.uiMsgType = RELAYMESSAGE2;
-						strcpy(MessageHead.cMyName, mRecvMsg->cMyName);
-						strcpy(MessageHead.cToName, mRecvMsg->cToName);
-						MessageHead.p2pMsg.uiSendLen = (int)strlen(recvmessage) + 1;
-						strcpy(MessageHead.p2pMsg.cP2PCommUserName, mRecvMsg->cMyName);
-
-						//∑¢ÀÕp2pœ˚œ¢Õ∑
-						int send_count = sendto(sockSrv, (const char*)&MessageHead, sizeof(MessageHead), 0, 
-						(const sockaddr*)&remote, sizeof(remote));
-						//∑¢ÀÕp2pœ˚œ¢ÃÂ
-						send_count = sendto(sockSrv, (const char*)&recvmessage, MessageHead.p2pMsg.uiSendLen, 0, 
-						(const sockaddr*)&remote, sizeof(remote));
+							
+							//∑¢ÀÕp2pœ˚œ¢ÃÂ
+							send_count = sendto(sockSrv, (const char*)&recvmessage, MessageHead.rlyMsg.uiSendLen, 0, 
+							(const sockaddr*)&remote, sizeof(remote));
+						}
 					}
 
-				//	delete[] recvmessage;
+					delete[] recvmessage;
+						
+					
 				//	sendto(PrimaryUDP, (const char*)&mTransMsg, sizeof(stCommMsg),0,(const sockaddr*)&remote,sizeof(remote));
 					break;
 				}
@@ -373,161 +388,6 @@ int main(int argc, char* argv[])
    	return 0;
 }
 
-
-#if 0 //use tcp only
-	int ret = 0;
-	pthread_t thd_stun_t;
-	pthread_t thd_login_t;
-
-	int         epoll_fd;  
-	int         nread;  
-	int         cur_fds;                //!> ÂΩìÂâçÂ∑≤ÁªèÂ≠òÂú®ÁöÑÊï∞Èáè   
-	int         wait_fds; 
-
-	struct  epoll_event ev;  
-	struct  epoll_event evs[MAXEPOLL];  
-	struct  rlimit  rlt;       
-
-	socklen_t   len = sizeof( struct sockaddr_in );
-	char    buf[MAXLINE];
-
-	char localIp[64];
-	memset(localIp, 0, sizeof(localIp));
-	get_local_ip(localIp);
-//	printf("IP list:%s\n", localIp);
-
-	ret = setSrvNetInfo(localIp, &srvInfo);
-	if(ret < 0)
-	{
-		DPRINTK("server ip addr number must more than 1!!!\n");
-		return -1;
-	}
-
-	printf("server ip addr1:%s\n", srvInfo.srvIpAddr1);
-	printf("server ip addr2:%s\n", srvInfo.srvIpAddr2);
-
-	//start stun server
-#if 0	
-//#ifdef USE_STUN
-	ret = pthread_create(&thd_stun_t, NULL, stunServerThreadProc, (void *)&srvInfo);
-	if ( 0 != ret )
-	{
-		cerr << "Create stun server pthread fail" <<endl;
-	//    	return -1;
-	}
-   	ret = pthread_detach(thd_stun_t);
-//#else
-	 CreateThread(NULL, 0, stunServerThreadProc, srvInfo, 0, NULL);
-#endif
-
-	//epoll set
-	rlt.rlim_max = rlt.rlim_cur = MAXEPOLL;  
-	if( setrlimit( RLIMIT_NOFILE, &rlt ) == -1 )      
-	{  
-	    printf("Setrlimit Error : %d\n", errno);  
-	    exit( EXIT_FAILURE );  
-	} 
-
-	//**********************
-	int i;
-	int sockfd;  
-	struct sockaddr_in serv_addr; 
-	
-	if((sockfd = socket(AF_INET, SOCK_STREAM, 0))==-1)  
-	{  
-		printf(RED "create login socket error!!!\n" NONE);
-		exit(1);  
-	}  
-	
-	serv_addr.sin_family=AF_INET;  
-	serv_addr.sin_port=htons(SERVER_PORT);  
-	serv_addr.sin_addr.s_addr=INADDR_ANY;  
-	bzero(&(serv_addr.sin_zero),8);  
-
-	if( setnonblocking( sockfd ) == -1 )  
-	{  
-	    printf("Setnonblocking Error : %d\n", errno);  
-	    exit( EXIT_FAILURE );  
-	}
-	
-	if(bind(sockfd,(struct sockaddr *)&serv_addr,sizeof(struct sockaddr))==-1)  
-	{  
-		printf(RED "bind login sockaddr error!!!\n" NONE);
-		exit(1);  
-	}  
-	
-	if(listen(sockfd, MAXBACK)==-1)  
-	{  
-		printf(RED "login socket listen error!!!\n" NONE);  
-		exit(1);  
-	}
-
-	epoll_fd = epoll_create( MAXEPOLL );   
-	ev.events = EPOLLIN | EPOLLET;      
-	ev.data.fd = sockfd;                 
-	if( epoll_ctl( epoll_fd, EPOLL_CTL_ADD, sockfd, &ev ) < 0 )  
-	{  
-	    printf("Epoll Error : %d\n", errno);  
-	    exit( EXIT_FAILURE );  
-	}  
-	cur_fds = 1; 
-
-	PEER_INFO stPeer;
-	memset(&stPeer, 0, sizeof(PEER_INFO));
-	//list 
-/*	typedef list<PEER_INFO> PEERLIST;
-	PEERLIST peerlist;
-	typedef PEERLIST::iterator PeerListIter;
-	PeerListIter iter;*/
-
-	while (gRunning)
-	{
-		if( ( wait_fds = epoll_wait( epoll_fd, evs, cur_fds, -1 ) ) == -1 )  
-		{  
-		    printf( "Epoll Wait Error : %d\n", errno );  
-		    exit( EXIT_FAILURE );  
-		} 
-
-		for( i = 0; i < wait_fds; i++ )  
-		{  
-			if( evs[i].data.fd == sockfd && cur_fds < MAXEPOLL )   
-			{  
-			    if( ( stPeer.peerSkt = accept( sockfd, (struct sockaddr *)&stPeer.peer_addr, &len ) ) == -1 )  
-			    {  
-			        printf("Accept Error : %d\n", errno);  
-			        exit( EXIT_FAILURE );  
-			    }  
-			    printf("receive connect from %s:%d\n", inet_ntoa(stPeer.peer_addr.sin_addr), htons(stPeer.peer_addr.sin_port));  
-			      
-			    ev.events = EPOLLIN | EPOLLET;        
-			    ev.data.fd = stPeer.peerSkt;                   
-			    if( epoll_ctl( epoll_fd, EPOLL_CTL_ADD, stPeer.peerSkt, &ev ) < 0 )  
-			    {  
-			        printf("Epoll Error : %d\n", errno);  
-			        exit( EXIT_FAILURE );  
-			    }  
-			    ++cur_fds;   
-			    continue;         
-			}  
-
-			//save client
-			peerlist.push_back(stPeer);
-			
-			//recv data
-			pthread_attr_t attr;
-			pthread_t threadId;
-				
-			pthread_attr_init(&attr); 
-			pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM); 
-			pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-			if(pthread_create(&threadId,&attr, pthread_handle_message, (void*)&stPeer))
-			{ 
-				perror("pthread_creat error!"); 
-				exit(-1); 
-			}               
-		}
-	}
-#endif //use udt
 
 #if 0 //old
 int setSrvNetInfo(char *ips, SERVER_INFO *srvInfo)
@@ -709,29 +569,4 @@ DWORD WINAPI stunServerThreadProc(LPVOID);
 	}
 }
 #endif //for stun server
-
-#if 0 //old
-SERVER_INFO srvInfo;
-
-#define MAX_PEER_NUM                10
-
-#define MAXEPOLL    5000   /* ÂØπ‰∫éÊúçÂä°Âô®Êù•ËØ¥ÔºåËøô‰∏™ÂÄºÂèØ‰ª•ÂæàÂ§ßÁöÑÔºÅ */   
-#define MAXLINE     1024  
-#define MAXBACK 1000 
-
-typedef struct
-{
-	char peerType;
-	char bLogin;	
-	int peerSkt;
-	struct sockaddr_in peer_addr;	
-} PEER_INFO;
-
-//Peer list
-typedef list<PEER_INFO> PEERLIST;
-PEERLIST peerlist;
-typedef PEERLIST::iterator PeerListIter;
-PeerListIter iter;
-#endif
-
 
