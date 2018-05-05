@@ -1,137 +1,16 @@
 #ifndef _NET_DEF_H_
 #define _NET_DEF_H_
-#if 0 //old
-#include "type.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#define SERVER_PORT	(8888)
-
-typedef struct _SERVER_INFO_
-{
-	char srvIpAddr1[16];
-	char srvIpAddr2[16];
-	unsigned int srvPort1;
-}SERVER_INFO;
-
-
-//消息解析
-#define P2P_BUF_LEN_NOT_ENOUGH 			(-1000)   
-#define P2P_NOT_SUPPORT_CHIP				(-1001)
-#define P2P_UNKNOW_SENSOR_CHIP				(-1002)
-#define P2P_INPUT_PARAM_ERR					(-1003)
-#define P2P_MORE_THAN_MAX_MEDIA_NUM		(-1004)
-#define P2P_DEV_INIT_ERR						(-1005)
-#define P2P_MEDIA_SYS_NOT_INIT				(-1006)
-#define P2P_UNKNOW_ERR						(-1007)
-#define P2P_NOT_CREATE_JPEG_SNAP_MEDIA	(-1008)
-#define P2P_OP_TIME_OUT						(-1009)
-#define P2P_NOT_CREATE_AUDIO_MEDIA			(-1010)
-#define P2P_WORNG_MEDIA_ID					(-1011)
-#define P2P_MEM_MALLOC_ERR					(-1012)
-#define P2P_NULL_PTR_ERR						(-1013)
-
-#define NET_SEND_BUFFER_SIZE 1024*1024*2
-#define NET_SEND_IO_BUFFER_SIZE 1024*5
-
-//消息解析
-//Message for P2P IO contrl
-typedef enum {
-	IOCTRL_TYPE_LOGIN_REQ,	    //From App to Device
-	IOCTRL_TYPE_LOGIN_RESP,      //From Device to App
-
-	IOCTRL_TYPE_CONNECT_REQ,	    //From App to Device
-	IOCTRL_TYPE_CONNECT_RESP,      //From Device to App
-}P2P_IOCTRL_TYPE;
-
-typedef enum {
-	SIO_TYPE_UNKN,
-	SIO_TYPE_VIDEO_AUDIO_FRAME,	
-	SIO_TYPE_IOCTRL,
-	SIO_TYPE_DOWNLOAD_DATA,
-	SIO_TYPE_HEART_ALIVE_PACKET,
-	SIO_TYPE_UPGRADE_PACKET,
-}P2P_STREAM_IO_TYPE;
-
-typedef struct
-{
-        unsigned char u8StreamIOType; 			//填写 P2P_STREAM_IO_TYPE  中相关项
-        unsigned char  u8Reserved[3];
-        unsigned int u32DataSize;	                    //整个数据包长度
-}P2P_STREAM_IO_HEAD;
-
-//for SIO_TYPE_IOCTRL
-typedef struct{
-	unsigned short u16IOCtrlType;					//参考 P2P_IOCTRL_TYPE
-	unsigned short u16IOCtrlDataSize;
-	unsigned char   u8Reserve[4];
-}P2P_IO_CTRL_HEAD;
-
-typedef struct _VIDEO_FRAME_HEADER_
-{	
-	unsigned int nTimeStampMSec;				// 时间戳 毫秒	
-	unsigned int u32FrameDataLen;			       // 帧数据长度
-	unsigned char   u8Code;						//压缩格式 RJONE_CODE_TYPE
-	unsigned char   u8VideoFrameType;			// I帧 or  p帧or b帧  RJONE_VIDEO_FRAME
-	unsigned char   u8FrameIndex;			//帧计数，当是I帧时，u8rameIndex = 0，p帧时u8rameIndex=u8rameIndex+1. 这个变量主要用来判断丢帧情况。
-	unsigned char   u8Reserved[9];
-}P2P_VIDEO_FRAME_HEADER;
-
-typedef struct _AUDIO_FRAME_HEADER_
-{
-	unsigned char u8Code;							//压缩格式RJONE_CODE_TYPE
-	unsigned char u8AudioSamplerate;				//采样率 RJONE_AUDIO_SAMPLERATE
-	unsigned char u8AudioBits;						//采样位宽RJONE_AUDIO_DATABITS
-	unsigned char u8AudioChannel;					//通道		RJONE_AUDIO_CHANNEL					
-	unsigned int nTimeStampMSec;				// 时间戳 毫秒	
-	unsigned int u32FrameDataLen;			// 帧数据长度	
-	unsigned char   u8FrameIndex;			//帧计数，每来一帧 u8rameIndex=u8rameIndex+1. 这个变量主要用来判断丢帧情况。
-	unsigned char   u8Reserved[7];
-}P2P_AUDIO_FRAME_HEADER;
-
-
-// for SIO_TYPE_VIDEO_AUDIO_FRAME
-typedef struct _FRAME_HEAD_
-{	
-	unsigned char u8FrameType;  				       // 参考 RJONE_FRAME_TYPE
-	unsigned char u8FrameUseType;				// 参考 FRAME_USE_TYPE	
-	unsigned short u16FrameSplitPackTotalNum;	       // 单帧数据大小超过发送缓冲时，进行分包，u8FramePackNum表示分包的总个数。小于等于1  时，表示未分包。
-	unsigned short u16SplitPackNo;					// 当前分包的序号		
-	unsigned char   u8Reserved[2];
-	union
-	{
-		P2P_VIDEO_FRAME_HEADER stVideoFrameHead; 
-		P2P_AUDIO_FRAME_HEADER stAudioFrameHead;
-	};		
-}P2P_FRAME_HEAD;
-
-//***********
-typedef struct _LIST_WIFI_AP_REQ
-{
-	unsigned char u8Reserved[8];
-}P2P_LOGIN_REQ;
-
-
-
-
-#ifdef __cplusplus
-}
-#endif
-#else
 #include <string>
-#include <list>
 #include <string.h>
+#include "FTCTypedef.h"
+#include "FTCPeer.h"
 
 #define SERVER_PORT 8888	//服务器端口
 #define MAX_COMMAND 256
 #define MAXRETRY 5
 
-#define MAX_NAME_SIZE 15
-
 /*p2p通信协议*/
-
 //iMessageType值
 enum {
     MSG_LOGIN_REQ,	    
@@ -175,19 +54,6 @@ inline	void constructInPlace(_T1  *_Ptr)
 /// 声明变长指令
 #define BUFFER_CMD(cmd,name,len) char buffer##name[len]={0};\
 														cmd *name=(cmd *)buffer##name;constructInPlace(name);
-
-//客户节点信息
-struct stUserListNode
-{
-	char userName[MAX_NAME_SIZE];			// 节点的名字
-	unsigned int uiIP;				//  节点的IP
-	unsigned short usPORT;			// 节点的 PORT
-
-	stUserListNode()
-	{
-		bzero(this, sizeof(*this));
-	}
-};
 
 //Server向客户端发送打洞请求消息
 struct stTransMsg
@@ -253,15 +119,5 @@ struct stCommMsg
     
     unsigned int getSize() const { return sizeof(*this) + userNums * sizeof(stUserListNode); }
 };
-
-using namespace std;
-typedef list<stUserListNode*> UserList;
-
-typedef struct
-{
-	unsigned char bLogin;
-	char sMyName[MAX_NAME_SIZE];	
-} st_Peer;
-#endif
 
 #endif

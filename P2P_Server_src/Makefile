@@ -1,33 +1,32 @@
+CC = gcc
+CPLUSPLUS = g++
+OBJ = obj
+
 #gcc paramaters
-CPPFLAGS+=-g -O -Wall -w -lpthread
+CCFLAGS = -fPIC -Wall -O3 -w -lpthread
+CPPFLAGS = -fPIC -O3 -Wall -w -lpthread
 
 #third library
-HEADER_PATH = -I./include/
-LIB_PATH = -L./lib/
-LIBS = -ludt
+INC = -I./
+LIB_PATH =
+LIBS =
 
-all: server client 
+OBJS = FTCTask.o FTCSock.o nettool.o FTCPeer.o
 
+all: server client
+	chmod 777 server; chmod 777 client
+
+.c.o:
+	$(CC) -c $(INC) $(CFLAGS) $< -o $@
+
+.cpp.o:
+	$(CPLUSPLUS) -c $(INC) $(CPPFLAGS) $< -o $@
+	
 clean:
-	rm *.o server client; rm -rf /home/hly2070/share/server
+	rm -rf *.o server client
 
-server: server.o stun.o udp.o nettool.o
-	$(CXX) -o $@  $^ $(LIB_PATH) $(LIBS) $(CPPFLAGS)
+server: $(OBJS) server.o
+	$(CPLUSPLUS) -o $@  $^ $(INC) $(CPPFLAGS)
 
-client: client.o stun.o udp.o
-	$(CXX) -o $@  $^ $(LIB_PATH) $(LIBS) $(CPPFLAGS)
-
-%.o:%.cpp
-	$(CXX)  -c $< -o $@ $(HEADER_PATH) $(CPPFLAGS)
-
-%:RCS/%
-	co $@
-
-rel:
-	cp server /home/hly2070/share/
-
-# Dependancies
-server.o: ./include/*.h stun.h nettool.h net_def.h
-client.o: ./include/*.h stun.h
-stun.o: stun.h udp.h
-udp.o: stun.h udp.h
+client: $(OBJS) client.o
+	$(CPLUSPLUS) -o $@  $^ $(INC) $(CPPFLAGS)

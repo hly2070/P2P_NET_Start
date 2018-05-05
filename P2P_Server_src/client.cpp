@@ -4,27 +4,27 @@
 #include <cstdlib>   
 
 #ifndef WIN32
-   #include <unistd.h>
-   #include <cstdlib>
-   #include <cstring>
-   #include <netdb.h>
-   #include <sys/time.h>
+#include <unistd.h>
+#include <cstdlib>
+#include <cstring>
+#include <netdb.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <netinet/in.h>
 #include <errno.h>
 #else
-   #include <winsock2.h>
-   #include <ws2tcpip.h>
-   #include <wspiapi.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <wspiapi.h>
 #endif
 #include <iostream>
-#include <udt.h>
-#include "udp.h"
-#include "stun.h"
-#include "debug.h"
+//#include <udt.h>
+//#include "udp.h"
+//#include "stun.h"
+#include "FTCDebug.h"
 //#include "cc.h"
-#include "test_util.h"
+//#include "test_util.h"
 
 
 using namespace std;
@@ -44,7 +44,7 @@ usage()
 }
 
 #define MAX_NIC 3
-
+/*
 void getNATtype(int argc, char* argv[])
 {
 	initNetwork();
@@ -339,7 +339,8 @@ void getNATtype(int argc, char* argv[])
    cout << ret << dec << endl;
    cout.fill(' ');
 }
-
+*/ //hly2070
+/*
 #ifndef WIN32
 void* monitor(void* s)
 #else
@@ -380,9 +381,10 @@ DWORD WINAPI monitor(LPVOID s)
       return 0;
    #endif
 }
-
+*/
 int main(int argc, char* argv[])
 {
+#if 0 
    assert( sizeof(UInt8 ) == 1 );
    assert( sizeof(UInt16) == 2 );
    assert( sizeof(UInt32) == 4 );
@@ -490,7 +492,7 @@ int main(int argc, char* argv[])
 
    UDT::close(client);
    delete [] data;
-      
+#endif    
    return 0;
 }
 
