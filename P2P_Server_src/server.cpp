@@ -16,7 +16,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <netdb.h>
-#include <sys/epoll.h>            /* epollÂ§¥Êñá‰ª∂ */   
+#include <sys/epoll.h>            	/* epollÂ§¥Êñá‰ª∂ */   
 #include <fcntl.h>                    /* nonblockingÈúÄË¶Å */   
 #include <sys/resource.h>
 #else
@@ -30,10 +30,14 @@
 //#include "test_util.h"
 #include "FTCDebug.h"
 #include "nettool.h"
-#include "net_def.h"
+#include "FTCMessage.h"
 #include "FTCSock.h"
 #include "FTCTask.h"
 #include "FTCPeer.h"
+
+#define SERVER_PORT 8888	//∑˛ŒÒ∆˜∂Àø⁄
+#define MAX_COMMAND 256
+#define MAXRETRY 5
 
 using namespace std;
 
@@ -44,7 +48,7 @@ SOCKET sockSrv;
 void *P2PSrvProc(void *arg)
 {
 	S32 niTimeout = 0;
-	sockaddr_in sender;
+	struct sockaddr_in sender;
 	S8 buf[MAX_PACKET_SIZE] = {0};
 	stCommMsg* mRecvMsg = (stCommMsg*)buf;
 	socklen_t nLen = sizeof(sender);
@@ -56,7 +60,6 @@ void *P2PSrvProc(void *arg)
 	{
 		if(0 == FTC_SelectRead(sockSrv, niTimeout))
 		{
-		//	int ret = recvfrom(sockSrv, (char*)mRecvMsg , MAX_PACKET_SIZE, 0, (sockaddr*)&sender, &nLen);
 			S32 ret = FTC_Recvfrom2(sockSrv, (S8 *)mRecvMsg, MAX_PACKET_SIZE, &sender);
 			if (ret < 0)
 			{
@@ -68,7 +71,7 @@ void *P2PSrvProc(void *arg)
 				U32 mMsgType = mRecvMsg->uiMsgType;
 				switch (mMsgType)
 				{
-					case MSG_LOGIN_REQ:
+					case MSG_C_LOGIN:
 						{
 							std::cout << "has a client login, user name: " << mRecvMsg->cMyName << std::endl;
 
@@ -78,13 +81,15 @@ void *P2PSrvProc(void *arg)
 							
 							stUserListNode* currentUser = new stUserListNode;
 							memcpy(currentUser->userName, mRecvMsg->cMyName, MAX_NAME_SIZE);
-							currentUser->uiIP = ntohl(sender.sin_addr.s_addr);
-							currentUser->usPORT = ntohs(sender.sin_port);
+							//strcpy(currentUser->userName, mRecvMsg->cMyName);
+							currentUser->uiIP = FTC_Htonl(sender.sin_addr.s_addr);
+							currentUser->usPORT = FTC_Htons(sender.sin_port);
 
 							if(ClientList.size() > 0)
 							{
 								//check if the same
 								bool isExist = false;
+
 								isExist = CheckPeerListByName(&ClientList, mRecvMsg->cMyName);
 
 								if(!isExist)
@@ -95,7 +100,7 @@ void *P2PSrvProc(void *arg)
 								{
 									ClientList.remove(currentUser);
 
-									sendbuf->uiMsgType = MSG_LOGIN_RESP;
+									sendbuf->uiMsgType = MSG_R_LOGIN;
 									sendbuf->result = 1;
 									
 									FTC_Sendto2(sockSrv, (S8*)sendbuf, sendbuf->getSize(), &sender);
@@ -103,11 +108,12 @@ void *P2PSrvProc(void *arg)
 							}
 							else
 							{
+								P2P_DBG_DEBUG("have new user login!");
 								ClientList.push_back(currentUser);			//  do not exclude same name user
 							}
 
 							//send user list info to server
-							sendbuf->uiMsgType = MSG_LOGIN_RESP;
+							sendbuf->uiMsgType = MSG_R_LOGIN;
 							sendbuf->result = 0;
 							
 							for (UserList::iterator  ClientList_iter = ClientList.begin(); ClientList_iter != ClientList.end(); ++ClientList_iter)
@@ -124,19 +130,29 @@ void *P2PSrvProc(void *arg)
 							break;
 						}
 					
-					case MSG_LOGOUT_REQ:
+					case MSG_C_LOGOUT:
 						{
 							std::cout << "has a client logout, name:" << mRecvMsg->cMyName << std::endl;
+
 							RemovePeerByName(&ClientList, mRecvMsg->cMyName);
+
+							char sendBuf[MAX_PACKET_SIZE] = {0};
+							stCommMsg* sendbuf = (stCommMsg*) sendBuf;
+
+							sendbuf->uiMsgType = MSG_R_LOGOUT;
+							sendbuf->result = 0;
+
+							FTC_Sendto2(sockSrv, (S8*)sendbuf, sendbuf->getSize(), &sender);	
+							
 							break;
 						}
 					
-					case MSG_GETALLUSER_REQ:
+					case MSG_C_GET_PEERS:
 						{
 							char sendBuf[MAX_PACKET_SIZE] = {0};
 							stCommMsg* sendbuf = (stCommMsg*) sendBuf;
 							
-							sendbuf->uiMsgType = MSG_GETALLUSER_RESP;
+							sendbuf->uiMsgType = MSG_R_GET_PEERS;
 							for (UserList::iterator  ClientList_iter = ClientList.begin(); ClientList_iter != ClientList.end(); ++ClientList_iter)
 							{
 								memcpy(sendbuf->userList[sendbuf->userNums].userName, (*ClientList_iter)->userName,MAX_NAME_SIZE);
@@ -154,12 +170,12 @@ void *P2PSrvProc(void *arg)
 							break;
 						}
 
-					case MSG_HEART_CHECK_REQ:
+					case MSG_C_HEART_BEAT:
 						{
-							char sendBuf[MAX_PACKET_SIZE] = {0};
+						/*	char sendBuf[MAX_PACKET_SIZE] = {0};
 							stCommMsg* sendbuf = (stCommMsg*) sendBuf;
 							
-							sendbuf->uiMsgType = MSG_HEART_CHECK_RESP;
+							sendbuf->uiMsgType = MSG_R_HEART_BEAT;
 							for (UserList::iterator  ClientList_iter = ClientList.begin(); ClientList_iter != ClientList.end(); ++ClientList_iter)
 							{
 								memcpy(sendbuf->userList[sendbuf->userNums].userName, (*ClientList_iter)->userName,MAX_NAME_SIZE);
@@ -168,19 +184,19 @@ void *P2PSrvProc(void *arg)
 								++sendbuf->userNums;
 							}
 
-							FTC_Sendto2(sockSrv, (S8*)sendbuf, sendbuf->getSize(), &sender);
+							FTC_Sendto2(sockSrv, (S8*)sendbuf, sendbuf->getSize(), &sender); 
 						
-							unsigned int nodecount = ClientList.size();
+							unsigned int nodecount = ClientList.size(); */
 							
-							std::cout << "recv heart check msg" << nodecount << std::endl;
+							std::cout << "recv heart check msg from" << mRecvMsg->cMyName << std::endl;
 							
 							break;
 						}
 					
-					case MSG_CONNECT_REMOTE_REQ:
+					case MSG_C_HOLE:
 						{
 							//recv connet remote request.
-							bool isExist = CheckPeerListByName(&ClientList, mRecvMsg->cToName);
+							bool isExist = CheckPeerListByName(&ClientList, mRecvMsg->cMyName);
 							if(!isExist)
 							{
 								printf("User does not exist!!!\n");
@@ -188,14 +204,14 @@ void *P2PSrvProc(void *arg)
 								char sendBuf[MAX_PACKET_SIZE] = {0};
 								stCommMsg* sendbuf = (stCommMsg*) sendBuf;
 							
-								sendbuf->uiMsgType = MSG_CONNECT_REMOTE_RESP;
+								sendbuf->uiMsgType = MSG_R_HOLE;
 								sendbuf->result = 1;
 
 								FTC_Sendto2(sockSrv, (S8*)sendbuf, sendbuf->getSize(), &sender);
 							}
 							else
 							{
-								stUserListNode toPeer = GetPeerByName(&ClientList, mRecvMsg->cToName);
+								stUserListNode toPeer=GetUser(mRecvMsg->cToName);
 
 								sockaddr_in remote;
 								remote.sin_family=AF_INET;
@@ -221,7 +237,7 @@ void *P2PSrvProc(void *arg)
 					
 					case P2PHAVECONNECT1:
 					{
-						stUserListNode toPeer = GetPeerByName(&ClientList, mRecvMsg->cToName);
+						stUserListNode toPeer=GetUser(mRecvMsg->cToName);
 
 						sockaddr_in remote;
 						remote.sin_family=AF_INET;
@@ -241,7 +257,7 @@ void *P2PSrvProc(void *arg)
 
 					case RELAYMESSAGE:
 					{
-						stUserListNode toPeer = GetPeerByName(&ClientList, mRecvMsg->cToName);
+						stUserListNode toPeer = GetUser(mRecvMsg->cToName);
 
 						sockaddr_in remote;
 						remote.sin_family = AF_INET;
@@ -304,7 +320,8 @@ void *P2PSrvProc(void *arg)
 int main(int argc, char* argv[])
 {
 	S32 ret;
-	pthread_t th_p2p_proc;
+
+//	memset(&ClientList, 0, sizeof(UserList));
 	
 	sockSrv = FTC_CreateUdpSock(FTC_InetAddr("0.0.0.0"), FTC_Htons(SERVER_PORT));
 	if (0 > sockSrv)
@@ -316,7 +333,7 @@ int main(int argc, char* argv[])
 	FTC_CREATE_THREADEX(P2PSrvProc, NULL, ret); 
 	if (FALSE == ret)
 	{
-    	P2P_DBG_ERROR("p2p_srvProc start failed!");
+    		P2P_DBG_ERROR("p2p_srvProc start failed!");
 		return -1;
 	} 
 	

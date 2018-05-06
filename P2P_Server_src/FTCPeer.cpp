@@ -16,6 +16,7 @@
 **************************************************************************/
 #include <iostream>
 #include "FTCPeer.h"
+#include "FTCDebug.h"
 
 using namespace std;
 
@@ -30,7 +31,7 @@ using namespace std;
 * -----------------------------------------------
 * 2018/05/04	  V1.0		 hly2070	
 ***********************************************************************/
-stUserListNode GetPeerByName(UserList *ptPeerList, const S8 *userName)
+stUserListNode GetPeerByName(UserList *ptPeerList, S8 *userName)
 {
 	for (UserList::iterator ClientList_iter = ptPeerList->begin(); ClientList_iter != ptPeerList->end(); ++ClientList_iter)
 	{
@@ -53,13 +54,19 @@ stUserListNode GetPeerByName(UserList *ptPeerList, const S8 *userName)
 * -----------------------------------------------
 * 2018/05/04	  V1.0		 hly2070	
 ***********************************************************************/
-BOOL CheckPeerListByName(UserList *ptPeerList, const S8 *userName)
+BOOL CheckPeerListByName(UserList *ptPeerList, S8 *strUserName)
 {
 	BOOL isExist = FALSE;
-
+	
+	if(NULL == ptPeerList || NULL == strUserName)
+	{
+		P2P_DBG_ERROR("invalid value input!");
+		return isExist;
+	}
+	
 	for (UserList::iterator  ClientList_iter = ptPeerList->begin(); ClientList_iter != ptPeerList->end(); ++ClientList_iter)
 	{
-		if (strcmp((*ClientList_iter)->userName, userName) == 0)
+		if (strcmp((*ClientList_iter)->userName, strUserName) == 0)
 		{
 			isExist = TRUE;
 			break;
@@ -80,12 +87,17 @@ BOOL CheckPeerListByName(UserList *ptPeerList, const S8 *userName)
 * -----------------------------------------------
 * 2018/05/04	  V1.0		 hly2070	
 ***********************************************************************/
-void RemovePeerByName(UserList *ptPeerList, const S8 *userName)
+void RemovePeerByName(UserList *ptPeerList, S8 *strUserName)
 {
-
+	if(NULL == ptPeerList || NULL == strUserName)
+	{
+		P2P_DBG_ERROR("invalid value input!");
+		return;
+	}
+	
 	for (UserList::iterator  ClientList_iter = ptPeerList->begin(); ClientList_iter != ptPeerList->end(); ++ClientList_iter)
 	{
-		if (strcmp((*ClientList_iter)->userName, userName) == 0)
+		if (strcmp((*ClientList_iter)->userName, strUserName) == 0)
 		{
 			ClientList_iter = ptPeerList->erase(ClientList_iter);
 		}

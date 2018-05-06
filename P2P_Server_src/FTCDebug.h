@@ -21,6 +21,7 @@
 extern		"C"
 {
 #endif
+#include <stdio.h>
 
 #define NONE         "\033[m"
 #define RED          "\033[0;32;31m"

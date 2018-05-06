@@ -69,7 +69,7 @@ typedef struct
 * -----------------------------------------------
 * 2018/05/04	  V1.0		 hly2070	
 ***********************************************************************/
-stUserListNode GetPeerByName(UserList *ptPeerList, const S8 *userName);
+stUserListNode GetPeerByName(UserList *ptPeerList, S8 *userName);
 
 /**********************************************************************
 * 函数名称：CheckPeerListByName
@@ -82,7 +82,7 @@ stUserListNode GetPeerByName(UserList *ptPeerList, const S8 *userName);
 * -----------------------------------------------
 * 2018/05/04	  V1.0		 hly2070	
 ***********************************************************************/
-BOOL CheckPeerListByName(UserList *ptPeerList, const S8 *userName);
+BOOL CheckPeerListByName(UserList *ptPeerList, S8 *strUserName);
 
 /**********************************************************************
 * 函数名称：RemovePeerByName
@@ -95,6 +95,6 @@ BOOL CheckPeerListByName(UserList *ptPeerList, const S8 *userName);
 * -----------------------------------------------
 * 2018/05/04	  V1.0		 hly2070	
 ***********************************************************************/
-void RemovePeerByName(UserList *ptPeerList, const S8 *userName);
+void RemovePeerByName(UserList *ptPeerList, S8 *strUserName);
 
 #endif

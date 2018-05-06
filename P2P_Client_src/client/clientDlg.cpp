@@ -48,7 +48,7 @@ END_MESSAGE_MAP()
 
 CclientDlg::CclientDlg(CWnd* pParent /*=NULL*/)
 	: CDialog(CclientDlg::IDD, pParent)
-	, m_strServerAddr(_T("103.243.24.93")) 
+	, m_strServerAddr(_T("43.252.231.67")) 
 	, m_nServerPort(8888)
 	, m_strMyID(_T("andy"))
 	, m_strToID(_T("john"))
@@ -194,7 +194,6 @@ HCURSOR CclientDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
-
 void CclientDlg::OnBnClickedButton2()
 {
 	// TODO: 在此添加控件通知处理程序代码
@@ -231,7 +230,7 @@ DWORD thread_heart_proc(LPVOID arg)
 		else
 		{
 			p_dlg->GetUserList();
-			Sleep(500);
+			Sleep(30000);
 		}
 	}
 		
@@ -259,7 +258,7 @@ DWORD WINAPI thread_recv_proc(LPVOID arg)
 			unsigned int mMsgType = recvbuf->uiMsgType;
 			switch (mMsgType)
 			{
-			case MSG_LOGIN_RESP:
+			case MSG_R_LOGIN:
 			{
 				if (recvbuf->result == 0)
 				{
@@ -306,7 +305,20 @@ DWORD WINAPI thread_recv_proc(LPVOID arg)
 				break;
 			}
 
-			case MSG_HEART_CHECK_RESP:
+			case MSG_R_LOGOUT:
+			{
+				if (recvbuf->result == 0)
+				{
+					p_dlg->bLogin = FALSE;
+				}
+				else
+				{
+					AfxMessageBox("Logout failed!");
+				}
+				break;
+			}
+
+			case MSG_R_HEART_BEAT:
 			{
 				p_dlg->ClientList.clear();
 				unsigned int usercount = recvbuf->userNums;
@@ -323,7 +335,7 @@ DWORD WINAPI thread_recv_proc(LPVOID arg)
 				break;
 			}
 
-			case MSG_GETALLUSER_RESP:
+			case MSG_R_GET_PEERS:
 			{
 				CString str;
 				p_dlg->GetDlgItem(IDC_EDIT_LOG)->GetWindowText(str);
@@ -356,7 +368,7 @@ DWORD WINAPI thread_recv_proc(LPVOID arg)
 				break;
 			}
 
-			case MSG_CONNECT_REMOTE_RESP:
+			case MSG_R_HOLE:
 			{
 				if (recvbuf->result == 1)
 				{
@@ -588,7 +600,7 @@ void CclientDlg::OnBnClickedBtnConnet()
 	UpdateData(true);
 
 	stCommMsg sendbuf;
-	sendbuf.uiMsgType = MSG_CONNECT_REMOTE_REQ;
+	sendbuf.uiMsgType = MSG_C_HOLE;
 	strcpy(sendbuf.cMyName, m_strMyID.GetBuffer());
 	strcpy(sendbuf.cToName, m_strToID.GetBuffer());
 
@@ -607,7 +619,7 @@ void CclientDlg::OnBnClickedBtnDisconnect()
 	UpdateData(TRUE);
 
 	stCommMsg sendbuf;
-	sendbuf.uiMsgType = MSG_LOGOUT_REQ;
+	sendbuf.uiMsgType = MSG_C_LOGOUT;
 	strcpy(sendbuf.cMyName, m_strMyID.GetBuffer());
 
 	sendto(m_cliSocket, (const char*)&sendbuf, sendbuf.getSize(), 0, (const sockaddr*)&remoteAddr, sizeof(remoteAddr));	
@@ -699,7 +711,7 @@ void CclientDlg::OnBnClickedBtnLogin()
 	remoteAddr.sin_addr.S_un.S_addr = inet_addr(m_strServerAddr);
 
 	stCommMsg sendbuf;
-	sendbuf.uiMsgType = MSG_LOGIN_REQ;
+	sendbuf.uiMsgType = MSG_C_LOGIN;
 	memcpy(sendbuf.cMyName, m_strMyID.GetBuffer(), m_strMyID.GetLength());
 
 	int send_count;//此变量用于调试
@@ -722,7 +734,7 @@ void CclientDlg::UpdateCtrlStates()
 void CclientDlg::GetUserList()
 {
 	stCommMsg sendbuf;
-	sendbuf.uiMsgType = MSG_HEART_CHECK_REQ;
+	sendbuf.uiMsgType = MSG_C_HEART_BEAT;
 	strcpy(sendbuf.cMyName, m_strMyID.GetBuffer());
 
 	sendto(m_cliSocket, (const char*)&sendbuf, sendbuf.getSize(), 0, (const sockaddr*)&remoteAddr, sizeof(remoteAddr));
@@ -732,7 +744,7 @@ void CclientDlg::OnBnClickedBtnGetUsers()
 {
 	// TODO: 在此添加控件通知处理程序代码
 	stCommMsg sendbuf;
-	sendbuf.uiMsgType = MSG_GETALLUSER_REQ;
+	sendbuf.uiMsgType = MSG_C_GET_PEERS;
 	strcpy(sendbuf.cMyName, m_strMyID.GetBuffer());
 
 	sendto(m_cliSocket, (const char*)&sendbuf, sendbuf.getSize(), 0, (const sockaddr*)&remoteAddr, sizeof(remoteAddr));
