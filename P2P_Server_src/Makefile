@@ -11,7 +11,7 @@ INC = -I./
 LIB_PATH =
 LIBS =
 
-OBJS = FTCTask.o FTCSock.o nettool.o FTCPeer.o
+OBJS = FTCTask.o FTCSock.o nettool.o FTCPeer.o FTCMutex.o
 
 all: server client
 	chmod 777 server; chmod 777 client

@@ -34,6 +34,7 @@
 #include "FTCSock.h"
 #include "FTCTask.h"
 #include "FTCPeer.h"
+#include "FTCMutex.h"
 
 #define SERVER_PORT 8888	//·þÎñÆ÷¶Ë¿Ú
 #define MAX_COMMAND 256
@@ -77,7 +78,7 @@ void *P2PSrvProc(void *arg)
 
 							//insert this node
 							char sendBuf[MAX_PACKET_SIZE] = {0};
-							stCommMsg* sendbuf = (stCommMsg*) sendBuf;
+							stCommMsg* sendbuf = (stCommMsg*)sendBuf;
 							
 							stUserListNode* currentUser = new stUserListNode;
 							memcpy(currentUser->userName, mRecvMsg->cMyName, MAX_NAME_SIZE);
@@ -91,7 +92,6 @@ void *P2PSrvProc(void *arg)
 								bool isExist = false;
 
 								isExist = CheckPeerListByName(&ClientList, mRecvMsg->cMyName);
-
 								if(!isExist)
 								{
 									ClientList.push_back(currentUser);			//  do not exclude same name user
@@ -188,7 +188,7 @@ void *P2PSrvProc(void *arg)
 						
 							unsigned int nodecount = ClientList.size(); */
 							
-							std::cout << "recv heart check msg from" << mRecvMsg->cMyName << std::endl;
+							std::cout << "recv heart check msg from " << mRecvMsg->cMyName << std::endl;
 							
 							break;
 						}
@@ -211,7 +211,7 @@ void *P2PSrvProc(void *arg)
 							}
 							else
 							{
-								stUserListNode toPeer=GetUser(mRecvMsg->cToName);
+								stUserListNode toPeer = GetPeerByName(&ClientList, mRecvMsg->cToName);
 
 								sockaddr_in remote;
 								remote.sin_family=AF_INET;
@@ -237,7 +237,7 @@ void *P2PSrvProc(void *arg)
 					
 					case P2PHAVECONNECT1:
 					{
-						stUserListNode toPeer=GetUser(mRecvMsg->cToName);
+						stUserListNode toPeer = GetPeerByName(&ClientList, mRecvMsg->cToName);
 
 						sockaddr_in remote;
 						remote.sin_family=AF_INET;
@@ -257,7 +257,7 @@ void *P2PSrvProc(void *arg)
 
 					case RELAYMESSAGE:
 					{
-						stUserListNode toPeer = GetUser(mRecvMsg->cToName);
+						stUserListNode toPeer = GetPeerByName(&ClientList, mRecvMsg->cToName);
 
 						sockaddr_in remote;
 						remote.sin_family = AF_INET;
