@@ -175,6 +175,21 @@ typedef struct
 	U8 aucParam[MSG_PARAM_LEN];
 }T_Msg;
 
+/* µÇÂ¼ÏûÏ¢ */
+typedef struct
+{
+	S8 name[16];
+	S8 MyLanIP[16];
+	U16 MyLanPort;
+	S8 ID[8];
+}T_MsgLoginReq;
+
+typedef struct
+{
+	U8 result;      /* 0:seccuess 1:failed */
+	U8 reserve[7];
+}T_MsgLoginResp;
+
 //#ifdef __cplusplus
 //}
 //#endif
