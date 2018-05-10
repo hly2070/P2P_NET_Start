@@ -288,7 +288,7 @@ static S8 DoInput()
 			P2P_DBG_DEBUG("send login request to server.");
 			char strLanIp[16] = {0};
 			get_ip_addr("eth0", strLanIp);
-			LoginToServer(stPeerLocal.sMyName, strLanIp, "AAAAAAAA", LAN_PORT);
+			LoginToServer(stPeerLocal.sMyName, strLanIp, "AAAAAAA", LAN_PORT);
 		//	DoInput();
 		}
 		else if(strncmp(sInput, "get", 3) == 0)
@@ -299,7 +299,7 @@ static S8 DoInput()
 		else
 		{
 			printf("Invalid command!!!\n");
-			DoInput();
+			//	DoInput();
 		}
 	}
 }
@@ -396,10 +396,10 @@ int main(int argc, char* argv[])
 	} 
 	
 	/* main function*/
-	DoInput();
 	
 	while(1)
 	{
+		DoInput();
 		usleep(100000);
 	}
 	
