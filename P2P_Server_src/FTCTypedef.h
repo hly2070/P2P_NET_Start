@@ -36,7 +36,7 @@ extern "C" {
 
 #define	INVALID_SOCKET		(-1)
 
-#define MAX_NAME_SIZE 32
+#define MAX_NAME_SIZE 12
 
 /**************************************************************************
  *                         数据类型                                    *

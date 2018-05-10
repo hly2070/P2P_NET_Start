@@ -35,19 +35,23 @@
 using namespace std;
 
 //客户节点信息
-struct stUserListNode
+struct T_PeerInfo
 {
-	S8 userName[MAX_NAME_SIZE];			// 节点的名字
-	U32 uiIP;				//  节点的IP
-	U16 usPORT;			// 节点的 PORT
+	U8 bCorD;			//0:client 1:device
+	S8 name[MAX_NAME_SIZE];			// 节点的名字
+	S8 ID[8];
+	S8 sPubIp[16];				//  节点的IP
+	U16 usPubPort;			// 节点的 PORT
+	S8 sLanIp[16];
+	U16 usLanPort;
 
-	stUserListNode()
+/*	stUserListNode()
 	{
 		bzero(this, sizeof(*this));
-	}
+	}*/
 };
 
-typedef list<stUserListNode*> UserList;
+typedef list<T_PeerInfo*> PeerList;
 
 typedef struct
 {
@@ -69,7 +73,7 @@ typedef struct
 * -----------------------------------------------
 * 2018/05/04	  V1.0		 hly2070	
 ***********************************************************************/
-stUserListNode GetPeerByName(UserList *ptPeerList, S8 *userName);
+T_PeerInfo GetPeerByName(PeerList *ptPeerList, S8 *userName);
 
 /**********************************************************************
 * 函数名称：CheckPeerListByName
@@ -82,7 +86,7 @@ stUserListNode GetPeerByName(UserList *ptPeerList, S8 *userName);
 * -----------------------------------------------
 * 2018/05/04	  V1.0		 hly2070	
 ***********************************************************************/
-BOOL CheckPeerListByName(UserList *ptPeerList, S8 *strUserName);
+BOOL CheckPeerListByName(PeerList *ptPeerList, S8 *strUserName);
 
 /**********************************************************************
 * 函数名称：RemovePeerByName
@@ -95,6 +99,6 @@ BOOL CheckPeerListByName(UserList *ptPeerList, S8 *strUserName);
 * -----------------------------------------------
 * 2018/05/04	  V1.0		 hly2070	
 ***********************************************************************/
-void RemovePeerByName(UserList *ptPeerList, S8 *strUserName);
+void RemovePeerByName(PeerList *ptPeerList, S8 *strUserName);
 
 #endif

@@ -130,14 +130,14 @@ struct stCommMsg
 //    };
 
     unsigned int   userNums;			// 全部的客户端数量
-    stUserListNode userList[0];			//用于server向客户端发送客户列表
+    T_PeerInfo userList[0];			//用于server向客户端发送客户列表
         
     stCommMsg()
     {
     	bzero(this, sizeof(*this));
     }
     
-    unsigned int getSize() const { return sizeof(*this) + userNums * sizeof(stUserListNode); }
+    unsigned int getSize() const { return sizeof(*this) + userNums * sizeof(T_PeerInfo); }
 };
 
 /* 字节序*/
@@ -178,10 +178,11 @@ typedef struct
 /* 登录消息 */
 typedef struct
 {
-	S8 name[16];
+	S8 name[MAX_NAME_SIZE];
 	S8 MyLanIP[16];
 	U16 MyLanPort;
 	S8 ID[8];
+	U8 bCorD; /* 0:client 1:device*/
 }T_MsgLoginReq;
 
 typedef struct
@@ -189,6 +190,21 @@ typedef struct
 	U8 result;      /* 0:seccuess 1:failed */
 	U8 reserve[7];
 }T_MsgLoginResp;
+
+/* 获取服务器端终端列表信息 */
+typedef struct
+{
+	S8 name[MAX_NAME_SIZE];
+	U8 reserve[8];
+}T_MsgGetPeerListReq;
+
+typedef struct
+{
+	U32 uiPeerNums;
+	T_PeerInfo peerList[0];			//用于server向客户端发送客户列表
+	U8 reserve[8];
+}T_MsgGetPeerListResp;
+
 
 //#ifdef __cplusplus
 //}

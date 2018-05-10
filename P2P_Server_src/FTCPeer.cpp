@@ -31,11 +31,11 @@ using namespace std;
 * -----------------------------------------------
 * 2018/05/04	  V1.0		 hly2070	
 ***********************************************************************/
-stUserListNode GetPeerByName(UserList *ptPeerList, S8 *userName)
+T_PeerInfo GetPeerByName(PeerList *ptPeerList, S8 *userName)
 {
-	for (UserList::iterator ClientList_iter = ptPeerList->begin(); ClientList_iter != ptPeerList->end(); ++ClientList_iter)
+	for (PeerList::iterator ClientList_iter = ptPeerList->begin(); ClientList_iter != ptPeerList->end(); ++ClientList_iter)
 	{
-		if (strcmp((*ClientList_iter)->userName, userName) == 0)
+		if (strcmp((*ClientList_iter)->name, userName) == 0)
 			return *(*ClientList_iter);
 	}
 	
@@ -54,7 +54,7 @@ stUserListNode GetPeerByName(UserList *ptPeerList, S8 *userName)
 * -----------------------------------------------
 * 2018/05/04	  V1.0		 hly2070	
 ***********************************************************************/
-BOOL CheckPeerListByName(UserList *ptPeerList, S8 *strUserName)
+BOOL CheckPeerListByName(PeerList *ptPeerList, S8 *strUserName)
 {
 	BOOL isExist = FALSE;
 	
@@ -64,11 +64,12 @@ BOOL CheckPeerListByName(UserList *ptPeerList, S8 *strUserName)
 		return isExist;
 	}
 	
-	for (UserList::iterator  ClientList_iter = ptPeerList->begin(); ClientList_iter != ptPeerList->end(); ++ClientList_iter)
+	for (PeerList::iterator  ClientList_iter = ptPeerList->begin(); ClientList_iter != ptPeerList->end(); ++ClientList_iter)
 	{
-		if (strcmp((*ClientList_iter)->userName, strUserName) == 0)
+		if (strcmp((*ClientList_iter)->name, strUserName) == 0)
 		{
 			isExist = TRUE;
+		//	P2P_DBG_DEBUG("find name: %s in PeerList", strUserName);
 			break;
 		}
 	}
@@ -87,7 +88,7 @@ BOOL CheckPeerListByName(UserList *ptPeerList, S8 *strUserName)
 * -----------------------------------------------
 * 2018/05/04	  V1.0		 hly2070	
 ***********************************************************************/
-void RemovePeerByName(UserList *ptPeerList, S8 *strUserName)
+void RemovePeerByName(PeerList *ptPeerList, S8 *strUserName)
 {
 	if(NULL == ptPeerList || NULL == strUserName)
 	{
@@ -95,9 +96,9 @@ void RemovePeerByName(UserList *ptPeerList, S8 *strUserName)
 		return;
 	}
 	
-	for (UserList::iterator  ClientList_iter = ptPeerList->begin(); ClientList_iter != ptPeerList->end(); ++ClientList_iter)
+	for (PeerList::iterator  ClientList_iter = ptPeerList->begin(); ClientList_iter != ptPeerList->end(); ++ClientList_iter)
 	{
-		if (strcmp((*ClientList_iter)->userName, strUserName) == 0)
+		if (strcmp((*ClientList_iter)->name, strUserName) == 0)
 		{
 			ClientList_iter = ptPeerList->erase(ClientList_iter);
 		}

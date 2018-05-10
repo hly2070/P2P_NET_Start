@@ -1,3 +1,19 @@
+/**************************************************************************
+* °æ    È¨£º 	Copyright (c) 2018 FTC.
+* ÎÄ¼şÃû³Æ£º	server.cpp
+* ÎÄ¼ş±êÊ¶£º 
+* ÄÚÈİÕªÒª£º	P2P peer function define
+* ÆäËüËµÃ÷£º 
+* µ±Ç°°æ±¾£º	V1.0
+* ×÷    Õß£º	hly2070
+* Íê³ÉÈÕÆÚ£º	2018Äê05ÔÂ 09ÈÕ
+*
+* ĞŞ¸Ä¼ÇÂ¼1	£º
+* ĞŞ¸ÄÈÕÆÚ£º
+* °æ ±¾ ºÅ£º
+* ĞŞ ¸Ä ÈË£º
+* ĞŞ¸ÄÄÚÈİ£º
+**************************************************************************/
 #include <cassert>
 #include <cstring>
 #include <iostream>
@@ -16,8 +32,8 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <netdb.h>
-#include <sys/epoll.h>            	/* epollå¤´æ–‡ä»¶ */   
-#include <fcntl.h>                    /* nonblockingéœ€è¦ */   
+#include <sys/epoll.h>            	  
+#include <fcntl.h>                     
 #include <sys/resource.h>
 #else
 #include <winsock2.h>
@@ -43,25 +59,26 @@
 using namespace std;
 
 BOOL gRunning = TRUE;
-UserList ClientList;	//å®¢æˆ·èŠ‚ç‚¹åˆ—è¡¨
+PeerList ClientList;	
 SOCKET sockSrv;
 
 void *P2PSrvProc(void *arg)
 {
 	S32 niTimeout = 0;
-	struct sockaddr_in sender;
+	struct sockaddr_in fromAddr;
+	T_Msg stMsg;
 	S8 buf[MAX_PACKET_SIZE] = {0};
 	stCommMsg* mRecvMsg = (stCommMsg*)buf;
-	socklen_t nLen = sizeof(sender);
-	memset(&sender, 0, sizeof(sender));
-			
+//	socklen_t nLen = sizeof(fromAddr);
+	memset(&fromAddr, 0, sizeof(fromAddr));
+
 	FTC_PTHREAD_DETACH;
 	
 	while (gRunning)
 	{
 		if(0 == FTC_SelectRead(sockSrv, niTimeout))
 		{
-			S32 ret = FTC_Recvfrom2(sockSrv, (S8 *)mRecvMsg, MAX_PACKET_SIZE, &sender);
+			S32 ret = FTC_Recvfrom2(sockSrv, (S8 *)&stMsg, sizeof(stMsg), &fromAddr);
 			if (ret < 0)
 			{
 			//	std::cout << "recv error " << std::endl;
@@ -69,64 +86,77 @@ void *P2PSrvProc(void *arg)
 			}
 			else
 			{
-				U32 mMsgType = mRecvMsg->uiMsgType;
-				switch (mMsgType)
+				U32 mMsgID = stMsg.tMsgHead.uiMsgId;
+				switch (mMsgID)
 				{
 					case MSG_C_LOGIN:
 						{
-							std::cout << "has a client login, user name: " << mRecvMsg->cMyName << std::endl;
-
-							//insert this node
-							char sendBuf[MAX_PACKET_SIZE] = {0};
-							stCommMsg* sendbuf = (stCommMsg*)sendBuf;
+							T_MsgLoginReq *ptLoginMsg;
+							ptLoginMsg = (T_MsgLoginReq *)stMsg.aucParam;
 							
-							stUserListNode* currentUser = new stUserListNode;
-							memcpy(currentUser->userName, mRecvMsg->cMyName, MAX_NAME_SIZE);
-							//strcpy(currentUser->userName, mRecvMsg->cMyName);
-							currentUser->uiIP = FTC_Htonl(sender.sin_addr.s_addr);
-							currentUser->usPORT = FTC_Htons(sender.sin_port);
+							printf("user %s login, CorD: %d, Public info: [%s:%d], LAN info: [%s:%d], ID: %s\n", ptLoginMsg->name, ptLoginMsg->bCorD, 
+								inet_ntoa(fromAddr.sin_addr), htons(fromAddr.sin_port), ptLoginMsg->MyLanIP, ptLoginMsg->MyLanPort, ptLoginMsg->ID);
 
+							T_PeerInfo* tmpPeer = (T_PeerInfo*)malloc(sizeof(T_PeerInfo));
+							strcpy(tmpPeer->name, ptLoginMsg->name);
+							strcpy(tmpPeer->ID, ptLoginMsg->ID);
+							strcpy(tmpPeer->sLanIp, ptLoginMsg->MyLanIP);
+							tmpPeer->usLanPort = ptLoginMsg->MyLanPort;
+							strcpy(tmpPeer->sPubIp, inet_ntoa(fromAddr.sin_addr));
+							tmpPeer->usPubPort = htons(fromAddr.sin_port);
+							tmpPeer->bCorD = ptLoginMsg->bCorD;
+							
 							if(ClientList.size() > 0)
 							{
-								//check if the same
-								bool isExist = false;
+								//check if exist
+								BOOL isExist = FALSE;
 
-								isExist = CheckPeerListByName(&ClientList, mRecvMsg->cMyName);
+								isExist = CheckPeerListByName(&ClientList, ptLoginMsg->name);
 								if(!isExist)
 								{
-									ClientList.push_back(currentUser);			//  do not exclude same name user
+									ClientList.push_back(tmpPeer);			//  do not exclude same name user
 								}
 								else
 								{
-									ClientList.remove(currentUser);
+									T_Msg stMsg;
+									T_MsgLoginResp stLoginMsg;
 
-									sendbuf->uiMsgType = MSG_R_LOGIN;
-									sendbuf->result = 1;
-									
-									FTC_Sendto2(sockSrv, (S8*)sendbuf, sendbuf->getSize(), &sender);
+									memset(&stMsg, 0, sizeof(T_Msg));
+									memset(&stLoginMsg, 0, sizeof(T_MsgLoginResp));
+
+									stLoginMsg.result = 1;
+
+									stMsg.tMsgHead.uiMsgType = MSG_TYPE_RESPONSE;
+									stMsg.tMsgHead.uiMsgId = MSG_R_LOGIN;
+									stMsg.tMsgHead.usParaLength = sizeof(T_MsgLoginResp);
+									memcpy((T_MsgLoginResp *)stMsg.aucParam, &stLoginMsg, sizeof(stLoginMsg));
+
+									FTC_Sendto2(sockSrv, (S8 *)&stMsg, sizeof(stMsg), &fromAddr);
 								}
 							}
 							else
 							{
-								P2P_DBG_DEBUG("have new user login!");
-								ClientList.push_back(currentUser);			//  do not exclude same name user
+							//	printf("new user.\n");
+								ClientList.push_back(tmpPeer);			//  do not exclude same name user
+
+								T_Msg stMsg;
+								T_MsgLoginResp stLoginMsg;
+
+								memset(&stMsg, 0, sizeof(T_Msg));
+								memset(&stLoginMsg, 0, sizeof(T_MsgLoginResp));
+
+								stLoginMsg.result = 0;
+
+								stMsg.tMsgHead.uiMsgType = MSG_TYPE_RESPONSE;
+								stMsg.tMsgHead.uiMsgId = MSG_R_LOGIN;
+								stMsg.tMsgHead.usParaLength = sizeof(T_MsgLoginResp);
+								memcpy((T_MsgLoginResp *)stMsg.aucParam, &stLoginMsg, sizeof(stLoginMsg));
+
+								FTC_Sendto2(sockSrv, (S8 *)&stMsg, sizeof(stMsg), &fromAddr);
 							}
 
-							//send user list info to server
-							sendbuf->uiMsgType = MSG_R_LOGIN;
-							sendbuf->result = 0;
+							free(tmpPeer);
 							
-							for (UserList::iterator  ClientList_iter = ClientList.begin(); ClientList_iter != ClientList.end(); ++ClientList_iter)
-							{
-								memcpy(sendbuf->userList[sendbuf->userNums].userName, (*ClientList_iter)->userName,MAX_NAME_SIZE);
-								sendbuf->userList[sendbuf->userNums].uiIP = (*ClientList_iter)->uiIP;
-								sendbuf->userList[sendbuf->userNums].usPORT = (*ClientList_iter)->usPORT;
-								++sendbuf->userNums;
-							}
-
-							FTC_Sendto2(sockSrv, (S8*)sendbuf, sendbuf->getSize(), &sender);							
-						
-							delete currentUser;
 							break;
 						}
 					
@@ -142,30 +172,61 @@ void *P2PSrvProc(void *arg)
 							sendbuf->uiMsgType = MSG_R_LOGOUT;
 							sendbuf->result = 0;
 
-							FTC_Sendto2(sockSrv, (S8*)sendbuf, sendbuf->getSize(), &sender);	
+							FTC_Sendto2(sockSrv, (S8*)sendbuf, sendbuf->getSize(), &fromAddr);	
 							
 							break;
 						}
 					
 					case MSG_C_GET_PEERS:
 						{
-							char sendBuf[MAX_PACKET_SIZE] = {0};
-							stCommMsg* sendbuf = (stCommMsg*) sendBuf;
+							T_MsgGetPeerListReq *ptMsg;
+							ptMsg = (T_MsgGetPeerListReq *)stMsg.aucParam;
+							
+							printf("user %s want to get all peers info.\n", ptMsg->name);
+
+							T_Msg stMsg;
+							T_MsgGetPeerListResp stSubMsg;
+
+							memset(&stMsg, 0, sizeof(T_Msg));
+							memset(&stSubMsg, 0, sizeof(T_MsgGetPeerListResp));
+							
+							for (PeerList::iterator  ClientList_iter = ClientList.begin(); ClientList_iter != ClientList.end(); ++ClientList_iter)
+							{
+								strcpy(stSubMsg.peerList[stSubMsg.uiPeerNums].name, (*ClientList_iter)->name);
+								strcpy(stSubMsg.peerList[stSubMsg.uiPeerNums].ID, (*ClientList_iter)->ID);
+								stSubMsg.peerList[stSubMsg.uiPeerNums].bCorD = (*ClientList_iter)->bCorD;
+								strcpy(stSubMsg.peerList[stSubMsg.uiPeerNums].sPubIp, (*ClientList_iter)->sPubIp);
+								stSubMsg.peerList[stSubMsg.uiPeerNums].usPubPort = (*ClientList_iter)->usPubPort;
+								strcpy(stSubMsg.peerList[stSubMsg.uiPeerNums].sLanIp, (*ClientList_iter)->sLanIp);
+								stSubMsg.peerList[stSubMsg.uiPeerNums].usLanPort = (*ClientList_iter)->usLanPort;
+
+								stSubMsg.uiPeerNums++;
+							}
+
+							stMsg.tMsgHead.uiMsgType = MSG_TYPE_RESPONSE;
+							stMsg.tMsgHead.uiMsgId = MSG_R_GET_PEERS;
+							stMsg.tMsgHead.usParaLength = sizeof(stSubMsg)*stSubMsg.uiPeerNums;
+							memcpy((T_MsgGetPeerListResp *)stMsg.aucParam, &stSubMsg, sizeof(T_PeerInfo)*stSubMsg.uiPeerNums);
+
+							FTC_Sendto2(sockSrv, (S8*)&stMsg, sizeof(stMsg), &fromAddr);
+							
+						/*	char sendBuf[MAX_PACKET_SIZE] = {0};
+							stCommMsg* sendbuf = (stCommMsg*)sendBuf;
 							
 							sendbuf->uiMsgType = MSG_R_GET_PEERS;
-							for (UserList::iterator  ClientList_iter = ClientList.begin(); ClientList_iter != ClientList.end(); ++ClientList_iter)
+							for (PeerList::iterator  ClientList_iter = ClientList.begin(); ClientList_iter != ClientList.end(); ++ClientList_iter)
 							{
-								memcpy(sendbuf->userList[sendbuf->userNums].userName, (*ClientList_iter)->userName,MAX_NAME_SIZE);
-								sendbuf->userList[sendbuf->userNums].uiIP = (*ClientList_iter)->uiIP;
-								sendbuf->userList[sendbuf->userNums].usPORT = (*ClientList_iter)->usPORT;
+							//	memcpy(sendbuf->userList[sendbuf->userNums].userName, (*ClientList_iter)->name,MAX_NAME_SIZE);
+							//	sendbuf->userList[sendbuf->userNums].uiIP = (*ClientList_iter)->uiIP;
+							//	sendbuf->userList[sendbuf->userNums].usPORT = (*ClientList_iter)->usPORT;
 								++sendbuf->userNums;
 							}
 
-							FTC_Sendto2(sockSrv, (S8*)sendbuf, sendbuf->getSize(), &sender);
+							FTC_Sendto2(sockSrv, (S8*)sendbuf, sendbuf->getSize(), &fromAddr);
 						
 							unsigned int nodecount = ClientList.size();
 							
-							std::cout << "want get all user list" << nodecount << std::endl;
+							std::cout << "want get all user list" << nodecount << std::endl; */
 
 							break;
 						}
@@ -188,7 +249,7 @@ void *P2PSrvProc(void *arg)
 						
 							unsigned int nodecount = ClientList.size(); */
 							
-							std::cout << "recv heart check msg from " << mRecvMsg->cMyName << std::endl;
+							std::cout << "recv heart baet msg from " << (S8 *)stMsg.aucParam << std::endl;
 							
 							break;
 						}
@@ -207,13 +268,13 @@ void *P2PSrvProc(void *arg)
 								sendbuf->uiMsgType = MSG_R_HOLE;
 								sendbuf->result = 1;
 
-								FTC_Sendto2(sockSrv, (S8*)sendbuf, sendbuf->getSize(), &sender);
+								FTC_Sendto2(sockSrv, (S8*)sendbuf, sendbuf->getSize(), &fromAddr);
 							}
 							else
 							{
-								stUserListNode toPeer = GetPeerByName(&ClientList, mRecvMsg->cToName);
+								T_PeerInfo toPeer = GetPeerByName(&ClientList, mRecvMsg->cToName);
 
-								sockaddr_in remote;
+							/*	sockaddr_in remote;
 								remote.sin_family=AF_INET;
 								remote.sin_port=htons(toPeer.usPORT);
 								remote.sin_addr.s_addr=htonl(toPeer.uiIP);
@@ -230,24 +291,24 @@ void *P2PSrvProc(void *arg)
 								mTransMsg.transMsg.usPORT = ntohs(sender.sin_port);
 								strcpy(mTransMsg.transMsg.userName, mRecvMsg->cMyName);
 
-								FTC_Sendto2(sockSrv, (S8*)&mTransMsg, sizeof(stCommMsg), &remote);
+								FTC_Sendto2(sockSrv, (S8*)&mTransMsg, sizeof(stCommMsg), &remote); */
 							}
 							break;
 						}
 					
 					case P2PHAVECONNECT1:
 					{
-						stUserListNode toPeer = GetPeerByName(&ClientList, mRecvMsg->cToName);
+						T_PeerInfo toPeer = GetPeerByName(&ClientList, mRecvMsg->cToName);
 
 						sockaddr_in remote;
 						remote.sin_family=AF_INET;
-						remote.sin_port=htons(toPeer.usPORT);
-						remote.sin_addr.s_addr=htonl(toPeer.uiIP);
+					//	remote.sin_port=htons(toPeer.usPORT);
+					//	remote.sin_addr.s_addr=htonl(toPeer.uiIP);
 
 						stCommMsg mTransMsg;
 						mTransMsg.uiMsgType = P2PCANSTART;
-						mTransMsg.transMsg.uiIP = ntohl(sender.sin_addr.s_addr); 
-						mTransMsg.transMsg.usPORT = ntohs(sender.sin_port);
+						mTransMsg.transMsg.uiIP = ntohl(fromAddr.sin_addr.s_addr); 
+						mTransMsg.transMsg.usPORT = ntohs(fromAddr.sin_port);
 						strcpy(mTransMsg.transMsg.userName, mRecvMsg->cMyName);
 
 						FTC_Sendto2(sockSrv, (S8*)&mTransMsg, sizeof(stCommMsg), &remote);
@@ -257,12 +318,12 @@ void *P2PSrvProc(void *arg)
 
 					case RELAYMESSAGE:
 					{
-						stUserListNode toPeer = GetPeerByName(&ClientList, mRecvMsg->cToName);
+						T_PeerInfo toPeer = GetPeerByName(&ClientList, mRecvMsg->cToName);
 
 						sockaddr_in remote;
 						remote.sin_family = AF_INET;
-						remote.sin_port = htons(toPeer.usPORT);
-						remote.sin_addr.s_addr = htonl(toPeer.uiIP);
+					//	remote.sin_port = htons(toPeer.usPORT);
+					//	remote.sin_addr.s_addr = htonl(toPeer.uiIP);
 						
 						stCommMsg MessageHead;
 						MessageHead.uiMsgType = RELAYMESSAGE2;
@@ -273,7 +334,7 @@ void *P2PSrvProc(void *arg)
 						printf("%s -> %s, %d\n", mRecvMsg->cMyName, mRecvMsg->cToName, mRecvMsg->rlyMsg.uiSendLen);
 							
 						char *recvmessage = new char[mRecvMsg->rlyMsg.uiSendLen];
-						int recv = FTC_Recvfrom2(sockSrv, recvmessage, MAX_PACKET_SIZE, &sender);
+						int recv = FTC_Recvfrom2(sockSrv, recvmessage, MAX_PACKET_SIZE, &fromAddr);
 						printf("\r\nrecv data len = %d\r\n", recv);
 						recvmessage[recv - 1] = '\0';
 						if (recv <= 0)
@@ -333,7 +394,7 @@ int main(int argc, char* argv[])
 	FTC_CREATE_THREADEX(P2PSrvProc, NULL, ret); 
 	if (FALSE == ret)
 	{
-    		P2P_DBG_ERROR("p2p_srvProc start failed!");
+    	P2P_DBG_ERROR("P2PSrvProc start failed!");
 		return -1;
 	} 
 	
