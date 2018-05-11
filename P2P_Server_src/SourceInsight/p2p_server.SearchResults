@@ -1,0 +1,2 @@
+---- peers on server: Matches (1 in 1 files) ----
+Client.cpp (e:\p2p_project\p2p_net_start\p2p_server_src):						printf("%d peers on server:\n", ptSubMsg->uiPeerNums);

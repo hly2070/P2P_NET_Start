@@ -201,8 +201,8 @@ typedef struct
 typedef struct
 {
 	U32 uiPeerNums;
-	T_PeerInfo peerList[0];			//用于server向客户端发送客户列表
 	U8 reserve[8];
+	T_PeerInfo peerList[0];			//用于server向客户端发送客户列表
 }T_MsgGetPeerListResp;
 
 

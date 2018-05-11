@@ -124,6 +124,7 @@ int get_ip_addr(char *name, char *net_ip)
 
 	close(fd);
 
+	printf("get_ip_addr net_ip:%s\n",net_ip);
 	return	ret;
 }
 
@@ -142,10 +143,11 @@ void * SendHeartbeat(void *arg)
 	
 	while(1)
 	{
+		usleep(30000000);
+		
 		if(stPeerLocal.bIsLogin)
 			FTC_Sendto2(stPeerLocal.sockCli, (S8 *)&stMsg, sizeof(stMsg), &stPeerLocal.serverAddr);
 		
-		usleep(30000000);
 	}
 
 	FTC_PTHREAD_EXIT;
@@ -157,6 +159,7 @@ void *P2PClientProc(void *arg)
 	S32 niTimeout = 0;
 	struct sockaddr_in fromAddr;
 	T_Msg stMsg;
+	U32 mMsgID = 0;
 
 	memset(&fromAddr, 0, sizeof(fromAddr));
 	memset(&stMsg, 0, sizeof(T_Msg));
@@ -174,7 +177,7 @@ void *P2PClientProc(void *arg)
 			}
 			else
 			{
-				U32 mMsgID = stMsg.tMsgHead.uiMsgId;
+				mMsgID = stMsg.tMsgHead.uiMsgId;
 				
 				switch (mMsgID)
 				{
@@ -185,23 +188,12 @@ void *P2PClientProc(void *arg)
 						if(ptLoginMsg->result == 0)
 						{
 							printf("Login P2P server seccuss!\n");
-
 							stPeerLocal.bIsLogin = TRUE;
-
-							/* start hert beat thread. */
-							FTC_CREATE_THREADEX(SendHeartbeat, NULL, ret); 
-							if (FALSE == ret)
-							{
-						    	P2P_DBG_ERROR("SendHeartbeat start failed!");
-							}
-							
-							DoInput();
 						}
 						else
 						{
 							printf("Login P2P server failed!\n");
 							stPeerLocal.bIsLogin = FALSE;
-							DoInput();
 						}
 						break;
 						
@@ -211,7 +203,7 @@ void *P2PClientProc(void *arg)
 
 						printf("%d peers on server:\n", ptSubMsg->uiPeerNums);
 
-						if(stPeerLocal.ClientList.size() > 0)
+						if(stPeerLocal.ClientList.empty()!=NULL &&  stPeerLocal.ClientList.size() > 0)
 						{
 							stPeerLocal.ClientList.clear();
 						}
@@ -236,16 +228,18 @@ void *P2PClientProc(void *arg)
 							free(ptPeer);*/
 						}
 
-						DoInput();
+						//DoInput();
 						break;
 						
 					default:
+						printf("recv msgid:%d\n",mMsgID);
 						break;
 				}
 			}
 		}
 		else
 		{
+			usleep(100000);
 			continue;
 		}
 		
@@ -287,7 +281,7 @@ static S8 DoInput()
 		{
 			P2P_DBG_DEBUG("send login request to server.");
 			char strLanIp[16] = {0};
-			get_ip_addr("eth0", strLanIp);
+			get_ip_addr("eth2", strLanIp);
 			LoginToServer(stPeerLocal.sMyName, strLanIp, "AAAAAAA", LAN_PORT);
 		//	DoInput();
 		}
@@ -379,6 +373,14 @@ int main(int argc, char* argv[])
 	if (0 > stPeerLocal.sockLocal)
 	{
 		P2P_DBG_ERROR("FTC_CreateUdpSock create lan mode udp sock fail.");
+		return -1;
+	}
+
+	/* start hert beat thread. */
+	FTC_CREATE_THREADEX(SendHeartbeat, NULL, ret); 
+	if (FALSE == ret)
+	{
+    		P2P_DBG_ERROR("SendHeartbeat start failed!");
 		return -1;
 	}
 

@@ -185,30 +185,33 @@ void *P2PSrvProc(void *arg)
 							printf("user %s want to get all peers info.\n", ptMsg->name);
 
 							T_Msg stMsg;
-							T_MsgGetPeerListResp stSubMsg;
+							T_MsgGetPeerListResp *stSubMsg=NULL;
 
 							memset(&stMsg, 0, sizeof(T_Msg));
-							memset(&stSubMsg, 0, sizeof(T_MsgGetPeerListResp));
+							stSubMsg = (T_MsgGetPeerListResp *)stMsg.aucParam;
+							//memset(&stSubMsg, 0, sizeof(T_MsgGetPeerListResp));
 							
 							for (PeerList::iterator  ClientList_iter = ClientList.begin(); ClientList_iter != ClientList.end(); ++ClientList_iter)
 							{
-								strcpy(stSubMsg.peerList[stSubMsg.uiPeerNums].name, (*ClientList_iter)->name);
-								strcpy(stSubMsg.peerList[stSubMsg.uiPeerNums].ID, (*ClientList_iter)->ID);
-								stSubMsg.peerList[stSubMsg.uiPeerNums].bCorD = (*ClientList_iter)->bCorD;
-								strcpy(stSubMsg.peerList[stSubMsg.uiPeerNums].sPubIp, (*ClientList_iter)->sPubIp);
-								stSubMsg.peerList[stSubMsg.uiPeerNums].usPubPort = (*ClientList_iter)->usPubPort;
-								strcpy(stSubMsg.peerList[stSubMsg.uiPeerNums].sLanIp, (*ClientList_iter)->sLanIp);
-								stSubMsg.peerList[stSubMsg.uiPeerNums].usLanPort = (*ClientList_iter)->usLanPort;
+								strcpy(stSubMsg->peerList[stSubMsg->uiPeerNums].name, (*ClientList_iter)->name);
+								strcpy(stSubMsg->peerList[stSubMsg->uiPeerNums].ID, (*ClientList_iter)->ID);
+								stSubMsg->peerList[stSubMsg->uiPeerNums].bCorD = (*ClientList_iter)->bCorD;
+								strcpy(stSubMsg->peerList[stSubMsg->uiPeerNums].sPubIp, (*ClientList_iter)->sPubIp);
+								stSubMsg->peerList[stSubMsg->uiPeerNums].usPubPort = (*ClientList_iter)->usPubPort;
+								strcpy(stSubMsg->peerList[stSubMsg->uiPeerNums].sLanIp, (*ClientList_iter)->sLanIp);
+								stSubMsg->peerList[stSubMsg->uiPeerNums].usLanPort = (*ClientList_iter)->usLanPort;
 
-								stSubMsg.uiPeerNums++;
+								stSubMsg->uiPeerNums++;
 							}
 
 							stMsg.tMsgHead.uiMsgType = MSG_TYPE_RESPONSE;
 							stMsg.tMsgHead.uiMsgId = MSG_R_GET_PEERS;
-							stMsg.tMsgHead.usParaLength = sizeof(stSubMsg)*stSubMsg.uiPeerNums;
-							memcpy((T_MsgGetPeerListResp *)stMsg.aucParam, &stSubMsg, sizeof(T_PeerInfo)*stSubMsg.uiPeerNums);
+							stMsg.tMsgHead.usParaLength = sizeof(stSubMsg)*stSubMsg->uiPeerNums;
+							//memcpy((T_MsgGetPeerListResp *)stMsg.aucParam, &stSubMsg, sizeof(T_PeerInfo)*stSubMsg.uiPeerNums);
 
 							FTC_Sendto2(sockSrv, (S8*)&stMsg, sizeof(stMsg), &fromAddr);
+
+							printf("MSG_C_GET_PEERS FTC_Sendto2\n");
 							
 						/*	char sendBuf[MAX_PACKET_SIZE] = {0};
 							stCommMsg* sendbuf = (stCommMsg*)sendBuf;
