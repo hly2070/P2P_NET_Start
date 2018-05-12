@@ -44,11 +44,6 @@ struct T_PeerInfo
 	U16 usPubPort;			// ½ÚµãµÄ PORT
 	S8 sLanIp[16];
 	U16 usLanPort;
-
-/*	stUserListNode()
-	{
-		bzero(this, sizeof(*this));
-	}*/
 };
 
 typedef list<T_PeerInfo*> PeerList;

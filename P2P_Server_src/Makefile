@@ -3,8 +3,8 @@ CPLUSPLUS = g++
 OBJ = obj
 
 #gcc paramaters
-CCFLAGS = -fPIC -g -Wall -O3 -w -lpthread
-CPPFLAGS = -fPIC -g -O3 -Wall -w -lpthread
+CCFLAGS = -lstdc++ -fPIC -g -Wall -O3 -w -lpthread
+CPPFLAGS = -lstdc++ -fPIC -g -O3 -Wall -w -lpthread
 
 #third library
 INC = -I./

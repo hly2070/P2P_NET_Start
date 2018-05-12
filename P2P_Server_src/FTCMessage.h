@@ -53,7 +53,10 @@ enum
  	MSG_R_GET_PEERS,      
 
 	MSG_C_HOLE,    
-	MSG_R_HOLE,      
+	MSG_R_HOLE,
+
+	MSG_C_HOLE_REQ,		//server send about A want connect to B
+	MSG_C_HOLE_RESP,
 
 	MSG_C_LOGOUT,	  
 	MSG_R_LOGOUT,     
@@ -205,6 +208,27 @@ typedef struct
 	T_PeerInfo peerList[0];			//用于server向客户端发送客户列表
 }T_MsgGetPeerListResp;
 
+/* P2P打洞请求消息 */
+typedef struct
+{
+	S8 myName[MAX_NAME_SIZE];
+	S8 toName[MAX_NAME_SIZE];
+	U8 reserve[8];
+}T_MsgHoleReq;
+
+typedef struct
+{
+	U8 result;      /* 0:seccuess 1:failed */
+	U8 reserve[7];
+}T_MsgHoleResp;
+
+/* P2P打洞请求服务器转发消息 */
+typedef struct
+{
+	S8 srcName[MAX_NAME_SIZE];
+	S8 srcPubIP[16];
+	U16 srcPubPort;
+}T_MsgHoleFromSrvReq;
 
 //#ifdef __cplusplus
 //}

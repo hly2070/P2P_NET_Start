@@ -56,14 +56,17 @@ typedef struct
 {
 	BOOL bIsLogin;
 	U8 bCorD;		/* 0:client 1:device */
+	S8 ID[8];
 	S8 sMyName[MAX_NAME_SIZE];
+	S8 sToName[MAX_NAME_SIZE];
 	SOCKET sockCli;		/* P2P通信socket */
 	SOCKET sockLocal;	/* 局域网通信socket */
 	struct sockaddr_in serverAddr;		/* 远端通信地址 */
-	PeerList ClientList;
+//	PeerList ClientList;
 }T_PeerLocal;
 
 T_PeerLocal stPeerLocal;
+PeerList ClientList;
 
 static S8 DoInput();
 
@@ -160,6 +163,7 @@ void *P2PClientProc(void *arg)
 	struct sockaddr_in fromAddr;
 	T_Msg stMsg;
 	U32 mMsgID = 0;
+	T_PeerInfo tmpPeer;
 
 	memset(&fromAddr, 0, sizeof(fromAddr));
 	memset(&stMsg, 0, sizeof(T_Msg));
@@ -203,32 +207,48 @@ void *P2PClientProc(void *arg)
 
 						printf("%d peers on server:\n", ptSubMsg->uiPeerNums);
 
-						if(stPeerLocal.ClientList.empty()!=NULL &&  stPeerLocal.ClientList.size() > 0)
+						if(ClientList.empty()!=NULL && ClientList.size() > 0)
 						{
-							stPeerLocal.ClientList.clear();
+							ClientList.clear();
 						}
 						
 						for(int i=0; i<ptSubMsg->uiPeerNums; i++)
 						{
-							printf("%s\n", ptSubMsg->peerList[i].name);
+						//	printf("%s\n", ptSubMsg->peerList[i].name);
 							
-						/*	T_PeerInfo *ptPeer = (T_PeerInfo *)malloc(sizeof(T_PeerInfo));
-							strcpy(ptPeer->name, ptSubMsg->peerList[i].name);
-							strcpy(ptPeer->ID, ptSubMsg->peerList[i].ID);
-							ptPeer->bCorD = ptSubMsg->peerList[i].bCorD;
-							strcpy(ptPeer->sPubIp, ptSubMsg->peerList[i].sPubIp);
-							ptPeer->usPubPort = ptSubMsg->peerList[i].usPubPort;
-							strcpy(ptPeer->sLanIp, ptSubMsg->peerList[i].sLanIp);
-							ptPeer->usLanPort = ptSubMsg->peerList[i].usLanPort;
-
-							printf("%s\n", ptPeer->name);
-
-							stPeerLocal.ClientList.push_back(ptPeer);
+							memset(&tmpPeer, 0, sizeof(T_PeerInfo));
 							
-							free(ptPeer);*/
+							strcpy(tmpPeer.name, ptSubMsg->peerList[i].name);
+							strcpy(tmpPeer.ID, ptSubMsg->peerList[i].ID);
+							tmpPeer.bCorD = ptSubMsg->peerList[i].bCorD;
+							strcpy(tmpPeer.sPubIp, ptSubMsg->peerList[i].sPubIp);
+							tmpPeer.usPubPort = ptSubMsg->peerList[i].usPubPort;
+							strcpy(tmpPeer.sLanIp, ptSubMsg->peerList[i].sLanIp);
+							tmpPeer.usLanPort = ptSubMsg->peerList[i].usLanPort;
+							
+							printf("%s\n", tmpPeer.name);
+							
+							ClientList.push_back(&tmpPeer);
 						}
+						break;
 
-						//DoInput();
+					case MSG_R_HOLE:
+						T_MsgHoleResp *pHoleResp;
+						pHoleResp = (T_MsgHoleResp*)stMsg.aucParam;
+
+						if(pHoleResp->result == 1)
+						{
+							printf("P2P hole failed!\n");
+						}
+						
+						break;
+
+					case MSG_C_HOLE_REQ:
+						T_MsgHoleFromSrvReq *pMsg;
+						pMsg = (T_MsgHoleFromSrvReq*)stMsg.aucParam;
+
+						
+						
 						break;
 						
 					default:
@@ -269,6 +289,28 @@ S8 GetPeerListFromServer()
 	return 0;
 }
 
+S8 SendP2PHoleMsg()
+{	
+	T_Msg stMsg;
+	T_MsgHoleReq stHoleMsg;
+
+	memset(&stMsg, 0, sizeof(T_Msg));
+	memset(&stHoleMsg, 0, sizeof(T_MsgHoleReq));
+
+	strcpy(stHoleMsg.myName, stPeerLocal.sMyName);
+	strcpy(stHoleMsg.toName, stPeerLocal.sToName);
+
+	stMsg.tMsgHead.uiMsgType = MSG_TYPE_REQUEST;
+	stMsg.tMsgHead.uiMsgId = MSG_C_HOLE;
+	stMsg.tMsgHead.usParaLength = sizeof(T_MsgHoleReq);
+	memcpy((T_MsgHoleReq *)stMsg.aucParam, &stHoleMsg, sizeof(stHoleMsg));
+
+	FTC_Sendto2(stPeerLocal.sockCli, (S8 *)&stMsg, sizeof(stMsg), &stPeerLocal.serverAddr);
+	printf("P2P holeing, wait...\n");
+	
+	return 0;
+}
+
 static S8 DoInput()
 {
 	S8 sInput[20];
@@ -281,19 +323,22 @@ static S8 DoInput()
 		{
 			P2P_DBG_DEBUG("send login request to server.");
 			char strLanIp[16] = {0};
-			get_ip_addr("eth2", strLanIp);
-			LoginToServer(stPeerLocal.sMyName, strLanIp, "AAAAAAA", LAN_PORT);
-		//	DoInput();
+			get_ip_addr("eth0", strLanIp);
+			LoginToServer(stPeerLocal.sMyName, strLanIp, stPeerLocal.ID, LAN_PORT);
 		}
 		else if(strncmp(sInput, "get", 3) == 0)
 		{
 			P2P_DBG_DEBUG("send get peer list request to server.");
 			GetPeerListFromServer();
 		}
+		else if(strncmp(sInput, "connect", 7) == 0)
+		{
+			P2P_DBG_DEBUG("send p2p hole request to %s.", stPeerLocal.sToName);
+			SendP2PHoleMsg();
+		}
 		else
 		{
 			printf("Invalid command!!!\n");
-			//	DoInput();
 		}
 	}
 }
@@ -306,7 +351,7 @@ int main(int argc, char* argv[])
 //	U16 uiSrvPort;
 //	S8 sSrvIP[16];
 //	S8 sMyName[32];
-	S8 sToName[32];
+//	S8 sToName[32];
 
 	if(argc != 5) // if 7 set p2p server ip and port by manual.
 	{
@@ -317,6 +362,7 @@ int main(int argc, char* argv[])
 	memset(&stPeerLocal, 0, sizeof(T_PeerLocal));
 	stPeerLocal.bIsLogin = FALSE;
 	stPeerLocal.bCorD = 1; //device
+	strcpy(stPeerLocal.ID, "AAAAAAA");
 	
 	/*命令行解析*/
 	while(niIndex < argc)
@@ -334,7 +380,7 @@ int main(int argc, char* argv[])
 			niIndex++;
 			if (niIndex < argc)
 			{
-				strcpy(sToName, argv[niIndex]);
+				strcpy(stPeerLocal.sToName, argv[niIndex]);
 			}
 		}
 	/*	else if (0 == strncmp(argv[niIndex], "-s", 2))
