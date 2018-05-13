@@ -246,7 +246,33 @@ void *P2PClientProc(void *arg)
 					case MSG_C_HOLE_REQ:
 						T_MsgHoleFromSrvReq *pMsg;
 						pMsg = (T_MsgHoleFromSrvReq*)stMsg.aucParam;
+						
+						printf("%s[%s:%d] want to connect to you with p2p.\n", pMsg->srcName, pMsg->srcPubIP, pMsg->srcPubPort);
 
+						sockaddr_in remote;
+						remote.sin_family = AF_INET;
+						remote.sin_addr.s_addr = FTC_InetAddr(pMsg->srcPubIP);
+						remote.sin_port = FTC_Htons(pMsg->srcPubPort);
+
+						//发送P2P  消息给对端
+						T_Msg stMsgSend;
+						T_MsgP2PConnreq stMsgSub;
+
+						memset(&stMsgSend, 0, sizeof(T_Msg));
+						memset(&stMsgSub, 0, sizeof(T_MsgHoleFromSrvReq));
+
+						strcpy(stMsgSub.connMsg, "hello");
+
+						stMsgSend.tMsgHead.uiMsgType = MSG_TYPE_REQUEST;
+						stMsgSend.tMsgHead.uiMsgId = MSG_C_P2P_CONN_REQ;
+						stMsgSend.tMsgHead.usParaLength = sizeof(stMsgSub);
+						memcpy(stMsgSend.aucParam, &stMsgSub, sizeof(stMsgSub));
+
+						FTC_Sendto2(stLocal.sockSrv, (S8*)&stMsgSend, sizeof(stMsgSend), &remote);
+
+						usleep(100000);
+
+						//通知服务端已给对方发送了打洞消息
 						
 						
 						break;

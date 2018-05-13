@@ -208,7 +208,7 @@ void *P2PSrvProc(void *arg)
 								strcpy(stSubMsg->peerList[stSubMsg->uiPeerNums].sLanIp, (*ClientList_iter)->sLanIp);
 								stSubMsg->peerList[stSubMsg->uiPeerNums].usLanPort = (*ClientList_iter)->usLanPort;
 
-							//	printf("send peer list name: src:%s dst:%s\n", (*ClientList_iter)->name, stSubMsg->peerList[stSubMsg->uiPeerNums].name);
+							//	printf("send peer list name: from:%s to:%s\n", (*ClientList_iter)->name, stSubMsg->peerList[stSubMsg->uiPeerNums].name);
 								stSubMsg->uiPeerNums++;
 							}
 

@@ -58,6 +58,9 @@ enum
 	MSG_C_HOLE_REQ,		//server send about A want connect to B
 	MSG_C_HOLE_RESP,
 
+	MSG_C_P2P_CONN_REQ,
+	MSG_C_P2P_CONN_RESP,
+
 	MSG_C_LOGOUT,	  
 	MSG_R_LOGOUT,     
 };	
@@ -229,6 +232,12 @@ typedef struct
 	S8 srcPubIP[16];
 	U16 srcPubPort;
 }T_MsgHoleFromSrvReq;
+
+/* Peer间P2P 打洞请求消息*/
+typedef struct
+{
+	S8 connMsg[8];
+}T_MsgP2PConnreq;
 
 //#ifdef __cplusplus
 //}
