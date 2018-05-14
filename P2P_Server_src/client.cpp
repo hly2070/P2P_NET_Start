@@ -73,7 +73,8 @@ static S8 DoInput();
 void usage()
 {
 //	printf("usage: ./client -u name -s serverip -p severport\n");
-	printf("usage: ./client -u myName -r targetName\n");
+	printf("usage: ./client -c(d) -u myName -r targetName\n");
+	printf("-c:client -d:device -u:youname -r:remotename\n");
 }
 
 S8 LoginToServer(S8 *strMyName, S8 *strLanIp, S8 *strID, U16 uLanPort)
@@ -261,14 +262,14 @@ void *P2PClientProc(void *arg)
 						memset(&stMsgSend, 0, sizeof(T_Msg));
 						memset(&stMsgSub, 0, sizeof(T_MsgHoleFromSrvReq));
 
-						strcpy(stMsgSub.connMsg, "hello");
+						strcpy(stMsgSub.myName, stPeerLocal.sMyName);
 
 						stMsgSend.tMsgHead.uiMsgType = MSG_TYPE_REQUEST;
 						stMsgSend.tMsgHead.uiMsgId = MSG_C_P2P_CONN_REQ;
 						stMsgSend.tMsgHead.usParaLength = sizeof(stMsgSub);
 						memcpy(stMsgSend.aucParam, &stMsgSub, sizeof(stMsgSub));
 
-						FTC_Sendto2(stLocal.sockSrv, (S8*)&stMsgSend, sizeof(stMsgSend), &remote);
+						FTC_Sendto2(stPeerLocal.sockCli, (S8*)&stMsgSend, sizeof(stMsgSend), &remote);
 
 						usleep(100000);
 
@@ -276,9 +277,18 @@ void *P2PClientProc(void *arg)
 						
 						
 						break;
+
+					case MSG_C_P2P_CONN_REQ:
+						T_MsgP2PConnreq *ptMsgSub;
+						ptMsgSub = (T_MsgP2PConnreq*)stMsg.aucParam;
+
+						printf("recv P2P connect request from %s [%s:%d]\n", ptMsgSub->myName, inet_ntoa(fromAddr.sin_addr), htons(fromAddr.sin_port));
+						
+						break;
 						
 					default:
 						printf("recv msgid:%d\n",mMsgID);
+						
 						break;
 				}
 			}
@@ -387,13 +397,12 @@ int main(int argc, char* argv[])
 
 	memset(&stPeerLocal, 0, sizeof(T_PeerLocal));
 	stPeerLocal.bIsLogin = FALSE;
-	stPeerLocal.bCorD = 1; //device
 	strcpy(stPeerLocal.ID, "AAAAAAA");
 	
 	/*√¸¡Ó––Ω‚Œˆ*/
 	while(niIndex < argc)
 	{
-		if (0 == strncmp(argv[niIndex], "-u", 2))
+		if (0 == strncmp(argv[niIndex], "-u", 2))	/* local peer name */
 		{
 			niIndex++;
 			if (niIndex < argc)
@@ -401,12 +410,28 @@ int main(int argc, char* argv[])
 				strcpy(stPeerLocal.sMyName, argv[niIndex]);
 			}
 		}
-		else if (0 == strncmp(argv[niIndex], "-r", 2))
+		else if (0 == strncmp(argv[niIndex], "-r", 2))	/* remote peer name */
 		{
 			niIndex++;
 			if (niIndex < argc)
 			{
 				strcpy(stPeerLocal.sToName, argv[niIndex]);
+			}
+		}
+		else if (0 == strncmp(argv[niIndex], "-d", 2))  /* i am a device */
+		{
+			niIndex++;
+			if (niIndex < argc)
+			{
+				stPeerLocal.bCorD = 1;
+			}
+		}
+		else if (0 == strncmp(argv[niIndex], "-c", 2)) /* i am a client */
+		{
+			niIndex++;
+			if (niIndex < argc)
+			{
+				stPeerLocal.bCorD = 0;
 			}
 		}
 	/*	else if (0 == strncmp(argv[niIndex], "-s", 2))
@@ -456,12 +481,12 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 
-	//init server addr
+	//p2p server addr
 	stPeerLocal.serverAddr.sin_family = AF_INET;
 	stPeerLocal.serverAddr.sin_addr.s_addr  = FTC_InetAddr(SERVER_IP);	//FTC_InetAddr(sSrvIP);
 	stPeerLocal.serverAddr.sin_port = FTC_Htons(SERVER_PORT); 	//FTC_Htons(uiSrvPort);
 
-	/* */
+	/* P2P message recv proc */
 	FTC_CREATE_THREADEX(P2PClientProc, NULL, ret); 
 	if (FALSE == ret)
 	{

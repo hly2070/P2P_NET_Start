@@ -236,7 +236,7 @@ typedef struct
 /* Peer间P2P 打洞请求消息*/
 typedef struct
 {
-	S8 connMsg[8];
+	S8 myName[MAX_NAME_SIZE];
 }T_MsgP2PConnreq;
 
 //#ifdef __cplusplus

@@ -106,35 +106,59 @@ void *P2PSrvProc(void *arg)
 							printf("user %s login, CorD: %d, Public info: [%s:%d], LAN info: [%s:%d], ID: %s\n", ptLoginMsg->name, ptLoginMsg->bCorD, 
 								inet_ntoa(fromAddr.sin_addr), htons(fromAddr.sin_port), ptLoginMsg->MyLanIP, ptLoginMsg->MyLanPort, ptLoginMsg->ID);
 
-							T_PeerInfo tmpPeer;
-							memset(&tmpPeer, 0, sizeof(T_PeerInfo));
-							strcpy(tmpPeer.name, ptLoginMsg->name);
-							strcpy(tmpPeer.ID, ptLoginMsg->ID);
-							strcpy(tmpPeer.sLanIp, ptLoginMsg->MyLanIP);
-							tmpPeer.usLanPort = ptLoginMsg->MyLanPort;
-							strcpy(tmpPeer.sPubIp, inet_ntoa(fromAddr.sin_addr));
-							tmpPeer.usPubPort = htons(fromAddr.sin_port);
-							tmpPeer.bCorD = ptLoginMsg->bCorD;
-							
-							if(ClientList.empty()!=NULL && ClientList.size() > 0) //
+							/* 只有设备类型为device才需要保存起来 */
+						//	if(ptLoginMsg->bCorD == 1)
 							{
-								//check if exist
-								BOOL isExist = FALSE;
-
-								isExist = CheckPeerListByName(&ClientList, ptLoginMsg->name);
-								if(!isExist)
+								T_PeerInfo tmpPeer;
+								memset(&tmpPeer, 0, sizeof(T_PeerInfo));
+								strcpy(tmpPeer.name, ptLoginMsg->name);
+								strcpy(tmpPeer.ID, ptLoginMsg->ID);
+								strcpy(tmpPeer.sLanIp, ptLoginMsg->MyLanIP);
+								tmpPeer.usLanPort = ptLoginMsg->MyLanPort;
+								strcpy(tmpPeer.sPubIp, inet_ntoa(fromAddr.sin_addr));
+								tmpPeer.usPubPort = htons(fromAddr.sin_port);
+								tmpPeer.bCorD = ptLoginMsg->bCorD;
+								
+								if(ClientList.empty()!=NULL && ClientList.size() > 0) //
 								{
-									ClientList.push_back(&tmpPeer);			//  do not exclude same name user
+									//check if exist
+									BOOL isExist = FALSE;
+
+									isExist = CheckPeerListByName(&ClientList, ptLoginMsg->name);
+									if(!isExist)
+									{
+										ClientList.push_back(&tmpPeer);			//  do not exclude same name user
+									}
+									else
+									{
+										T_Msg stMsgSend;
+										T_MsgLoginResp stLoginMsg;
+
+										memset(&stMsgSend, 0, sizeof(T_Msg));
+										memset(&stLoginMsg, 0, sizeof(T_MsgLoginResp));
+
+										stLoginMsg.result = 1;
+
+										stMsgSend.tMsgHead.uiMsgType = MSG_TYPE_RESPONSE;
+										stMsgSend.tMsgHead.uiMsgId = MSG_R_LOGIN;
+										stMsgSend.tMsgHead.usParaLength = sizeof(T_MsgLoginResp);
+										memcpy((T_MsgLoginResp *)stMsgSend.aucParam, &stLoginMsg, sizeof(stLoginMsg));
+
+										FTC_Sendto2(stLocal.sockSrv, (S8 *)&stMsgSend, sizeof(stMsgSend), &fromAddr);
+									}
 								}
 								else
 								{
+									//printf("new user.\n");
+									ClientList.push_back(&tmpPeer);			//  do not exclude same name user
+									
 									T_Msg stMsgSend;
 									T_MsgLoginResp stLoginMsg;
 
 									memset(&stMsgSend, 0, sizeof(T_Msg));
 									memset(&stLoginMsg, 0, sizeof(T_MsgLoginResp));
 
-									stLoginMsg.result = 1;
+									stLoginMsg.result = 0;
 
 									stMsgSend.tMsgHead.uiMsgType = MSG_TYPE_RESPONSE;
 									stMsgSend.tMsgHead.uiMsgId = MSG_R_LOGIN;
@@ -144,27 +168,6 @@ void *P2PSrvProc(void *arg)
 									FTC_Sendto2(stLocal.sockSrv, (S8 *)&stMsgSend, sizeof(stMsgSend), &fromAddr);
 								}
 							}
-							else
-							{
-								//printf("new user.\n");
-								ClientList.push_back(&tmpPeer);			//  do not exclude same name user
-								
-								T_Msg stMsgSend;
-								T_MsgLoginResp stLoginMsg;
-
-								memset(&stMsgSend, 0, sizeof(T_Msg));
-								memset(&stLoginMsg, 0, sizeof(T_MsgLoginResp));
-
-								stLoginMsg.result = 0;
-
-								stMsgSend.tMsgHead.uiMsgType = MSG_TYPE_RESPONSE;
-								stMsgSend.tMsgHead.uiMsgId = MSG_R_LOGIN;
-								stMsgSend.tMsgHead.usParaLength = sizeof(T_MsgLoginResp);
-								memcpy((T_MsgLoginResp *)stMsgSend.aucParam, &stLoginMsg, sizeof(stLoginMsg));
-
-								FTC_Sendto2(stLocal.sockSrv, (S8 *)&stMsgSend, sizeof(stMsgSend), &fromAddr);
-							}
-
 							break;
 						}
 					
