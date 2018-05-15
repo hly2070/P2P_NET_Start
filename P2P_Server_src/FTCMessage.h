@@ -56,10 +56,19 @@ enum
 	MSG_R_HOLE,
 
 	MSG_C_HOLE_REQ,		//server send about A want connect to B
-	MSG_C_HOLE_RESP,
+	MSG_R_HOLE_RESP,
 
 	MSG_C_P2P_CONN_REQ,
-	MSG_C_P2P_CONN_RESP,
+	MSG_R_P2P_CONN_RESP,
+
+	MSG_C_HAVE_SEND_P2P_REQ,
+	MSG_R_HAVE_SEND_P2P_RESP,
+
+	MSG_C_P2P_CAN_START_REQ,
+	MSG_R_P2P_CAN_START_RESP,
+	
+	MSG_C_P2P_START_REQ,
+	MSG_R_P2P_START_RESP,
 
 	MSG_C_LOGOUT,	  
 	MSG_R_LOGOUT,     
@@ -233,11 +242,53 @@ typedef struct
 	U16 srcPubPort;
 }T_MsgHoleFromSrvReq;
 
-/* Peer间P2P 打洞请求消息*/
+/* Peer间P2P 打洞请求消息 */
 typedef struct
 {
 	S8 myName[MAX_NAME_SIZE];
-}T_MsgP2PConnreq;
+}T_MsgP2PConnReq;
+
+typedef struct
+{
+	U8 result;      /* 0:seccuess 1:failed */
+	U8 reserve[7];
+}T_MsgP2PConnResp;
+
+/* Peer通知服务器已经往对端发送了P2P连接请求 */
+typedef struct
+{
+	S8 myName[MAX_NAME_SIZE];
+	S8 toName[MAX_NAME_SIZE];
+}T_MsgHaveSendP2PReq;
+
+/* Peer尝试给对端发送P2P消息 */
+typedef struct
+{
+	S8 myName[MAX_NAME_SIZE];
+}T_MsgP2PStartReq;
+
+typedef struct
+{
+	U8 reserve[8];
+}T_MsgP2PStartResp;
+
+/* P2P server通知对端可以开始给对端发P2P请求消息 */
+typedef struct
+{
+	S8 myName[MAX_NAME_SIZE];
+}T_MsgP2PCanStartReq;
+
+/* Peer端发送给服务器的注销登录消息 */
+typedef struct
+{
+	S8 myName[MAX_NAME_SIZE];
+}T_MsgLogoutReq;
+
+typedef struct
+{
+	U8 result;      /* 0:seccuess 1:failed */
+	U8 reserve[7];
+}T_MsgLogoutResp;
 
 //#ifdef __cplusplus
 //}

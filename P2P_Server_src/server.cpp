@@ -173,17 +173,27 @@ void *P2PSrvProc(void *arg)
 					
 					case MSG_C_LOGOUT:
 						{
-							std::cout << "has a client logout, name:" << mRecvMsg->cMyName << std::endl;
+							T_MsgLogoutReq *ptSubMsg;
+							ptSubMsg = (T_MsgLogoutReq*)stMsg.aucParam;
 
-							RemovePeerByName(&ClientList, mRecvMsg->cMyName);
+							printf("recv logout message from: %s\n", ptSubMsg->myName);
 
-							char sendBuf[MAX_PACKET_SIZE] = {0};
-							stCommMsg* sendbuf = (stCommMsg*) sendBuf;
+							RemovePeerByName(&ClientList, ptSubMsg->myName);
 
-							sendbuf->uiMsgType = MSG_R_LOGOUT;
-							sendbuf->result = 0;
+							T_Msg stMsgSend;
+							T_MsgLogoutResp stLogoutMsg;
 
-							FTC_Sendto2(stLocal.sockSrv, (S8*)sendbuf, sendbuf->getSize(), &fromAddr);	
+							memset(&stMsgSend, 0, sizeof(T_Msg));
+							memset(&stLogoutMsg, 0, sizeof(T_MsgLogoutResp));
+
+							stLogoutMsg.result = 0;
+
+							stMsgSend.tMsgHead.uiMsgType = MSG_TYPE_RESPONSE;
+							stMsgSend.tMsgHead.uiMsgId = MSG_R_LOGOUT;
+							stMsgSend.tMsgHead.usParaLength = sizeof(T_MsgLoginResp);
+							memcpy((T_MsgLogoutResp *)stMsgSend.aucParam, &stLogoutMsg, sizeof(stLogoutMsg));
+
+							FTC_Sendto2(stLocal.sockSrv, (S8 *)&stMsgSend, sizeof(stMsgSend), &fromAddr);	
 							
 							break;
 						}
@@ -309,27 +319,36 @@ void *P2PSrvProc(void *arg)
 							}
 							break;
 						}
-					
-					case P2PHAVECONNECT1:
-					{
-						T_PeerInfo toPeer = GetPeerByName(&ClientList, mRecvMsg->cToName);
 
-						sockaddr_in remote;
-						remote.sin_family=AF_INET;
-					//	remote.sin_port=htons(toPeer.usPORT);
-					//	remote.sin_addr.s_addr=htonl(toPeer.uiIP);
+					case MSG_C_HAVE_SEND_P2P_REQ:
+						{
+							T_MsgHaveSendP2PReq *ptSubMsg;
+							ptSubMsg = (T_MsgHaveSendP2PReq *)stMsg.aucParam;
+							
+							T_PeerInfo toPeer = GetPeerByName(&ClientList, ptSubMsg->toName);
+							
+							sockaddr_in remote;
+							remote.sin_family = AF_INET;
+							remote.sin_addr.s_addr = FTC_InetAddr(toPeer.sPubIp);
+							remote.sin_port = FTC_Htons(toPeer.usPubPort);
 
-						stCommMsg mTransMsg;
-						mTransMsg.uiMsgType = P2PCANSTART;
-						mTransMsg.transMsg.uiIP = ntohl(fromAddr.sin_addr.s_addr); 
-						mTransMsg.transMsg.usPORT = ntohs(fromAddr.sin_port);
-						strcpy(mTransMsg.transMsg.userName, mRecvMsg->cMyName);
+							T_Msg stMsgSend;
+							T_MsgP2PCanStartReq stMsgSub;
 
-						FTC_Sendto2(stLocal.sockSrv, (S8*)&mTransMsg, sizeof(stCommMsg), &remote);
-								
+							memset(&stMsgSend, 0, sizeof(T_Msg));
+							memset(&stMsgSub, 0, sizeof(T_MsgP2PCanStartReq));
+
+							strcpy(stMsgSub.myName, ptSubMsg->myName);
+
+							stMsgSend.tMsgHead.uiMsgType = MSG_TYPE_INDICATE;
+							stMsgSend.tMsgHead.uiMsgId = MSG_C_P2P_CAN_START_REQ;
+							stMsgSend.tMsgHead.usParaLength = sizeof(stMsgSub);
+							memcpy(stMsgSend.aucParam, &stMsgSub, sizeof(stMsgSub));
+
+							FTC_Sendto2(stLocal.sockSrv, (S8*)&stMsgSend, sizeof(stMsgSend), &remote);
+						}
 						break;
-					}
-
+						
 					case RELAYMESSAGE:
 					{
 						T_PeerInfo toPeer = GetPeerByName(&ClientList, mRecvMsg->cToName);

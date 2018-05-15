@@ -187,108 +187,195 @@ void *P2PClientProc(void *arg)
 				switch (mMsgID)
 				{
 					case MSG_R_LOGIN:
-						T_MsgLoginResp *ptLoginMsg;
-						ptLoginMsg = (T_MsgLoginResp *)stMsg.aucParam;
+						{
+							T_MsgLoginResp *ptLoginMsg;
+							ptLoginMsg = (T_MsgLoginResp *)stMsg.aucParam;
 
-						if(ptLoginMsg->result == 0)
-						{
-							printf("Login P2P server seccuss!\n");
-							stPeerLocal.bIsLogin = TRUE;
-						}
-						else
-						{
-							printf("Login P2P server failed!\n");
-							stPeerLocal.bIsLogin = FALSE;
+							if(ptLoginMsg->result == 0)
+							{
+								printf("Login P2P server seccuss!\n");
+								stPeerLocal.bIsLogin = TRUE;
+							}
+							else
+							{
+								printf("Login P2P server failed!\n");
+								stPeerLocal.bIsLogin = FALSE;
+							}
 						}
 						break;
 						
 					case MSG_R_GET_PEERS:
-						T_MsgGetPeerListResp *ptSubMsg;
-						ptSubMsg = (T_MsgGetPeerListResp *)stMsg.aucParam;
-
-						printf("%d peers on server:\n", ptSubMsg->uiPeerNums);
-
-						if(ClientList.empty()!=NULL && ClientList.size() > 0)
 						{
-							ClientList.clear();
-						}
-						
-						for(int i=0; i<ptSubMsg->uiPeerNums; i++)
-						{
-						//	printf("%s\n", ptSubMsg->peerList[i].name);
+							T_MsgGetPeerListResp *ptSubMsg;
+							ptSubMsg = (T_MsgGetPeerListResp *)stMsg.aucParam;
+
+							printf("%d peers on server:\n", ptSubMsg->uiPeerNums);
+
+							if(ClientList.empty()!=NULL && ClientList.size() > 0)
+							{
+								ClientList.clear();
+							}
 							
-							memset(&tmpPeer, 0, sizeof(T_PeerInfo));
-							
-							strcpy(tmpPeer.name, ptSubMsg->peerList[i].name);
-							strcpy(tmpPeer.ID, ptSubMsg->peerList[i].ID);
-							tmpPeer.bCorD = ptSubMsg->peerList[i].bCorD;
-							strcpy(tmpPeer.sPubIp, ptSubMsg->peerList[i].sPubIp);
-							tmpPeer.usPubPort = ptSubMsg->peerList[i].usPubPort;
-							strcpy(tmpPeer.sLanIp, ptSubMsg->peerList[i].sLanIp);
-							tmpPeer.usLanPort = ptSubMsg->peerList[i].usLanPort;
-							
-							printf("%s\n", tmpPeer.name);
-							
-							ClientList.push_back(&tmpPeer);
+							for(int i=0; i<ptSubMsg->uiPeerNums; i++)
+							{
+							//	printf("%s\n", ptSubMsg->peerList[i].name);
+								
+								memset(&tmpPeer, 0, sizeof(T_PeerInfo));
+								
+								strcpy(tmpPeer.name, ptSubMsg->peerList[i].name);
+								strcpy(tmpPeer.ID, ptSubMsg->peerList[i].ID);
+								tmpPeer.bCorD = ptSubMsg->peerList[i].bCorD;
+								strcpy(tmpPeer.sPubIp, ptSubMsg->peerList[i].sPubIp);
+								tmpPeer.usPubPort = ptSubMsg->peerList[i].usPubPort;
+								strcpy(tmpPeer.sLanIp, ptSubMsg->peerList[i].sLanIp);
+								tmpPeer.usLanPort = ptSubMsg->peerList[i].usLanPort;
+								
+								printf("%s\n", tmpPeer.name);
+								
+								ClientList.push_back(&tmpPeer);
+							}
 						}
 						break;
 
 					case MSG_R_HOLE:
-						T_MsgHoleResp *pHoleResp;
-						pHoleResp = (T_MsgHoleResp*)stMsg.aucParam;
-
-						if(pHoleResp->result == 1)
 						{
-							printf("P2P hole failed!\n");
+							T_MsgHoleResp *pHoleResp;
+							pHoleResp = (T_MsgHoleResp*)stMsg.aucParam;
+
+							if(pHoleResp->result == 1)
+							{
+								printf("P2P hole failed!\n");
+							}
 						}
-						
 						break;
 
 					case MSG_C_HOLE_REQ:
-						T_MsgHoleFromSrvReq *pMsg;
-						pMsg = (T_MsgHoleFromSrvReq*)stMsg.aucParam;
-						
-						printf("%s[%s:%d] want to connect to you with p2p.\n", pMsg->srcName, pMsg->srcPubIP, pMsg->srcPubPort);
+						{
+							T_MsgHoleFromSrvReq *pMsg;
+							pMsg = (T_MsgHoleFromSrvReq*)stMsg.aucParam;
+							
+							printf("%s[%s:%d] want to connect to you with p2p.\n", pMsg->srcName, pMsg->srcPubIP, pMsg->srcPubPort);
 
-						sockaddr_in remote;
-						remote.sin_family = AF_INET;
-						remote.sin_addr.s_addr = FTC_InetAddr(pMsg->srcPubIP);
-						remote.sin_port = FTC_Htons(pMsg->srcPubPort);
+							sockaddr_in remote;
+							remote.sin_family = AF_INET;
+							remote.sin_addr.s_addr = FTC_InetAddr(pMsg->srcPubIP);
+							remote.sin_port = FTC_Htons(pMsg->srcPubPort);
 
-						//发送P2P  消息给对端
-						T_Msg stMsgSend;
-						T_MsgP2PConnreq stMsgSub;
+							//发送P2P  消息给对端
+							T_Msg stMsgSend;
+							T_MsgP2PConnReq stMsgSub;
 
-						memset(&stMsgSend, 0, sizeof(T_Msg));
-						memset(&stMsgSub, 0, sizeof(T_MsgHoleFromSrvReq));
+							memset(&stMsgSend, 0, sizeof(T_Msg));
+							memset(&stMsgSub, 0, sizeof(T_MsgHoleFromSrvReq));
 
-						strcpy(stMsgSub.myName, stPeerLocal.sMyName);
+							strcpy(stMsgSub.myName, stPeerLocal.sMyName);
 
-						stMsgSend.tMsgHead.uiMsgType = MSG_TYPE_REQUEST;
-						stMsgSend.tMsgHead.uiMsgId = MSG_C_P2P_CONN_REQ;
-						stMsgSend.tMsgHead.usParaLength = sizeof(stMsgSub);
-						memcpy(stMsgSend.aucParam, &stMsgSub, sizeof(stMsgSub));
+							stMsgSend.tMsgHead.uiMsgType = MSG_TYPE_REQUEST;
+							stMsgSend.tMsgHead.uiMsgId = MSG_C_P2P_CONN_REQ;
+							stMsgSend.tMsgHead.usParaLength = sizeof(stMsgSub);
+							memcpy(stMsgSend.aucParam, &stMsgSub, sizeof(stMsgSub));
 
-						FTC_Sendto2(stPeerLocal.sockCli, (S8*)&stMsgSend, sizeof(stMsgSend), &remote);
+							FTC_Sendto2(stPeerLocal.sockCli, (S8*)&stMsgSend, sizeof(stMsgSend), &remote);
 
-						usleep(100000);
+							usleep(50000);
 
-						//通知服务端已给对方发送了打洞消息
-						
-						
+							//通知服务端已给对方发送了打洞消息
+							T_MsgHaveSendP2PReq stMsgSub2;
+
+							memset(&stMsgSend, 0, sizeof(T_Msg));
+							memset(&stMsgSub2.toName, 0, sizeof(T_MsgHaveSendP2PReq));
+
+							strcpy(stMsgSub2.myName, stPeerLocal.sMyName);
+							strcpy(stMsgSub2.toName, stPeerLocal.sToName);
+
+							stMsgSend.tMsgHead.uiMsgType = MSG_TYPE_INDICATE;
+							stMsgSend.tMsgHead.uiMsgId = MSG_C_HAVE_SEND_P2P_REQ;
+							stMsgSend.tMsgHead.usParaLength = sizeof(stMsgSub2);
+							memcpy(stMsgSend.aucParam, &stMsgSub2, sizeof(stMsgSub2));
+							
+							FTC_Sendto2(stPeerLocal.sockCli, (S8*)&stMsgSend, sizeof(stMsgSend), &fromAddr);
+						}
 						break;
 
 					case MSG_C_P2P_CONN_REQ:
-						T_MsgP2PConnreq *ptMsgSub;
-						ptMsgSub = (T_MsgP2PConnreq*)stMsg.aucParam;
+						{
+							T_MsgP2PConnReq *ptMsgSub;
+							ptMsgSub = (T_MsgP2PConnReq*)stMsg.aucParam;
 
-						printf("recv P2P connect request from %s [%s:%d]\n", ptMsgSub->myName, inet_ntoa(fromAddr.sin_addr), htons(fromAddr.sin_port));
-						
+							printf("recv P2P connect request from %s [%s:%d]\n", ptMsgSub->myName, inet_ntoa(fromAddr.sin_addr), 
+								htons(fromAddr.sin_port));
+						}
+						break;
+
+					case MSG_C_P2P_CAN_START_REQ:
+						{
+							T_MsgP2PCanStartReq *ptMsgSub;
+							ptMsgSub = (T_MsgP2PCanStartReq*)stMsg.aucParam;
+
+							T_PeerInfo toPeer = GetPeerByName(&ClientList, ptMsgSub->myName);
+								
+							sockaddr_in remote;
+							remote.sin_family = AF_INET;
+							remote.sin_addr.s_addr = FTC_InetAddr(toPeer.sPubIp);
+							remote.sin_port = FTC_Htons(toPeer.usPubPort);
+
+							T_Msg stSendMsg;
+							T_MsgP2PStartReq stSubMsg;
+
+							memset(&stSendMsg, 0, sizeof(T_Msg));
+							memset(&stSubMsg, 0, sizeof(T_MsgP2PStartReq));
+
+							strcpy(stSubMsg.myName, stPeerLocal.sMyName);
+							stSendMsg.tMsgHead.uiMsgType = MSG_TYPE_REQUEST;
+							stSendMsg.tMsgHead.uiMsgId = MSG_C_P2P_START_REQ;
+							stSendMsg.tMsgHead.usParaLength = sizeof(stSubMsg);
+							memcpy(stSendMsg.aucParam, &stSubMsg, sizeof(stSubMsg));
+
+							FTC_Sendto2(stPeerLocal.sockCli, (S8*)&stSendMsg, sizeof(stSendMsg), &remote);
+						}
+						break;
+
+					case MSG_C_P2P_START_REQ:
+						{
+							T_MsgP2PStartReq *ptMsgSub;
+							ptMsgSub = (T_MsgP2PStartReq*)stMsg.aucParam;
+
+							T_Msg stSendMsg;
+							T_MsgP2PStartResp stSubMsg;
+
+							memset(&stSendMsg, 0, sizeof(T_Msg));
+							memset(&stSubMsg, 0, sizeof(T_MsgP2PStartResp));
+							
+							stSendMsg.tMsgHead.uiMsgType = MSG_TYPE_RESPONSE;
+							stSendMsg.tMsgHead.uiMsgId = MSG_R_P2P_START_RESP;
+							stSendMsg.tMsgHead.usParaLength = sizeof(stSubMsg);
+							memcpy(stSendMsg.aucParam, &stSubMsg, sizeof(stSubMsg));
+
+							FTC_Sendto2(stPeerLocal.sockCli, (S8*)&stSendMsg, sizeof(stSendMsg), &fromAddr);
+						}
+						break;
+
+					case MSG_R_P2P_START_RESP:
+						{
+							printf("P2P connect ok!\n");
+						}
+						break;
+
+					case MSG_R_LOGOUT:
+						{
+							T_MsgLogoutResp *ptSubMsg;
+							ptSubMsg = (T_MsgLogoutResp*)stMsg.aucParam;
+
+							if(ptSubMsg->result == 0)
+							{
+								printf("logout done!\n");
+								stPeerLocal.bIsLogin = FALSE;
+							}
+						}
 						break;
 						
 					default:
 						printf("recv msgid:%d\n",mMsgID);
-						
 						break;
 				}
 			}
@@ -347,6 +434,26 @@ S8 SendP2PHoleMsg()
 	return 0;
 }
 
+S8 SendLogoutMsg()
+{
+	T_Msg stMsg;
+	T_MsgLogoutReq stSubMsg;
+
+	memset(&stMsg, 0, sizeof(T_Msg));
+	memset(&stSubMsg, 0, sizeof(T_MsgLogoutReq));
+
+	strcpy(stSubMsg.myName, stPeerLocal.sMyName);
+
+	stMsg.tMsgHead.uiMsgType = MSG_TYPE_REQUEST;
+	stMsg.tMsgHead.uiMsgId = MSG_C_LOGOUT;
+	stMsg.tMsgHead.usParaLength = sizeof(stSubMsg);
+	memcpy((T_MsgLogoutReq *)stMsg.aucParam, &stSubMsg, sizeof(stSubMsg));
+
+	FTC_Sendto2(stPeerLocal.sockCli, (S8 *)&stMsg, sizeof(stMsg), &stPeerLocal.serverAddr);
+	
+	return 0;
+}
+
 static S8 DoInput()
 {
 	S8 sInput[20];
@@ -371,6 +478,11 @@ static S8 DoInput()
 		{
 			P2P_DBG_DEBUG("send p2p hole request to %s.", stPeerLocal.sToName);
 			SendP2PHoleMsg();
+		}
+		else if(strncmp(sInput, "logout", 6) == 0)
+		{
+			P2P_DBG_DEBUG("send logout message to server.");
+			SendLogoutMsg();
 		}
 		else
 		{
