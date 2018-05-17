@@ -52,6 +52,9 @@
 #include "FTCPeer.h"
 #include "FTCMutex.h"
 
+#include "db_sqlite.h"
+
+
 #define SERVER_PORT 8888	//服务器端口
 #define MAX_COMMAND 256
 #define MAXRETRY 5
@@ -71,6 +74,49 @@ typedef struct
 T_LocalInfo stLocal;
 PeerList ClientList;
 
+
+
+#define P2P_DB_NAME "p2pinfo.db"
+
+char * table_create_sql[] = {
+"create table p2p_peerinfo(id integer primary key autoincrement,username varchar(48),pubipaddr varchar(16),\
+pubport integer,lanipaddr varchar(16),lanport integer,devicetype integer,loginstatus integer)",
+"create table p2p_dbversion(version integer)",
+};
+
+int initbasicdata(void)
+{
+	int i=0;
+	for(i=0; i<sizeof(table_create_sql)/sizeof(table_create_sql[0]);i++)
+	{
+		if(sqllite_insert(table_create_sql[i],NULL,0,NULL,1,NULL)<0)
+		{
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+void ResponseLoginmsg(struct sockaddr_in *remoteAddr,int value)
+{
+	T_Msg stMsgSend;
+	T_MsgLoginResp stLoginMsg;
+
+	memset(&stMsgSend, 0, sizeof(T_Msg));
+	memset(&stLoginMsg, 0, sizeof(T_MsgLoginResp));
+
+	stLoginMsg.result = value;
+
+	stMsgSend.tMsgHead.uiMsgType = MSG_TYPE_RESPONSE;
+	stMsgSend.tMsgHead.uiMsgId = MSG_R_LOGIN;
+	stMsgSend.tMsgHead.usParaLength = sizeof(T_MsgLoginResp);
+	memcpy((T_MsgLoginResp *)stMsgSend.aucParam, &stLoginMsg, sizeof(stLoginMsg));
+
+	FTC_Sendto2(stLocal.sockSrv, (S8 *)&stMsgSend, sizeof(stMsgSend), remoteAddr);	
+}
+
+
 void *P2PSrvProc(void *arg)
 {
 	S32 niTimeout = 0;
@@ -78,6 +124,8 @@ void *P2PSrvProc(void *arg)
 	T_Msg stMsg;
 	U32 mMsgID;
 	S8 buf[MAX_PACKET_SIZE] = {0};
+	S8 test_sql[256]={0};
+	T_PeerInfo* ptPeer = new T_PeerInfo;
 	stCommMsg* mRecvMsg = (stCommMsg*)buf;
 	memset(&fromAddr, 0, sizeof(fromAddr));
 
@@ -90,7 +138,7 @@ void *P2PSrvProc(void *arg)
 			S32 ret = FTC_Recvfrom2(stLocal.sockSrv, (S8 *)&stMsg, sizeof(stMsg), &fromAddr);
 			if (ret < 0)
 			{
-			//	std::cout << "recv error " << std::endl;
+				std::cout << "recv error " << std::endl;
 				continue;
 			}
 			else
@@ -105,21 +153,98 @@ void *P2PSrvProc(void *arg)
 							
 							printf("user %s login, CorD: %d, Public info: [%s:%d], LAN info: [%s:%d], ID: %s\n", ptLoginMsg->name, ptLoginMsg->bCorD, 
 								inet_ntoa(fromAddr.sin_addr), htons(fromAddr.sin_port), ptLoginMsg->MyLanIP, ptLoginMsg->MyLanPort, ptLoginMsg->ID);
+							strcpy(ptPeer->name, ptLoginMsg->name);
+							strcpy(ptPeer->ID, ptLoginMsg->ID);
+							strcpy(ptPeer->sLanIp, ptLoginMsg->MyLanIP);
+							ptPeer->usLanPort = ptLoginMsg->MyLanPort;
+							strcpy(ptPeer->sPubIp, inet_ntoa(fromAddr.sin_addr));
+							ptPeer->usPubPort = htons(fromAddr.sin_port);
+							ptPeer->bCorD = ptLoginMsg->bCorD;
+								
+							sprintf(test_sql,"select id,loginstatus from p2p_peerinfo where username=\"%s\";",ptLoginMsg->name);
+							sqlite3_stmt *stmt = NULL;
+							S32 t_id = 0;
+							S32 t_status = 0;
+ 							if(sqllite_query(test_sql,NULL,0,&stmt)==0)
+							{
+								PSS_DB_CPY_INT(t_id,stmt,0);
+								PSS_DB_CPY_INT(t_status,stmt,1);
+								sqlite3_finalize(stmt);
+								//check if exist
+								if(t_status == 1)
+								{
+									ResponseLoginmsg(&fromAddr,1);
+								}
+								else
+								{
+									strcpy(test_sql,"update p2p_peerinfo set pubipaddr=?,pubport=?,lanipaddr=?,lanport=?,devicetype=?,loginstatus=1 where username=? ;");
+									db_val_t params[6];
+									params[0].type = DB_STRING;
+									params[0].val.string_val = ptPeer->sPubIp;
+									params[1].type = DB_INT;
+									params[1].val.int_val = ptPeer->usPubPort;
+									params[2].type = DB_STRING;
+									params[2].val.string_val = ptPeer->sLanIp;
+									params[3].type = DB_INT;
+									params[3].val.int_val = ptPeer->usLanPort;
+									params[4].type = DB_INT;
+									params[4].val.int_val = ptPeer->bCorD;
+									params[5].type = DB_STRING;
+									params[5].val.string_val = ptPeer->name;
 
+									if(sqllite_update(test_sql,params,6)!=0)
+									{
+										printf("sqllite_update MSG_C_LOGIN err\n");
+										ResponseLoginmsg(&fromAddr,1);
+										
+									}
+									else
+									{
+										ResponseLoginmsg(&fromAddr,0);
+									}
+								}
+							}
+							else
+							{
+								strcpy(test_sql,"insert into p2p_peerinfo (pubipaddr,pubport,lanipaddr,lanport,devicetype,loginstatus,username) values(?,?,?,?,?,1,?) ;");
+								db_val_t params[6];
+								params[0].type = DB_STRING;
+								params[0].val.string_val = ptPeer->sPubIp;
+								params[1].type = DB_INT;
+								params[1].val.int_val = ptPeer->usPubPort;
+								params[2].type = DB_STRING;
+								params[2].val.string_val = ptPeer->sLanIp;
+								params[3].type = DB_INT;
+								params[3].val.int_val = ptPeer->usLanPort;
+								params[4].type = DB_INT;
+								params[4].val.int_val = ptPeer->bCorD;
+								params[5].type = DB_STRING;
+								params[5].val.string_val = ptPeer->name;
+
+								if(sqllite_insert(test_sql,params,6,NULL,1,NULL)!=0)
+								{
+									ResponseLoginmsg(&fromAddr,1);
+								}
+								else
+								{
+									ResponseLoginmsg(&fromAddr,0);
+								}
+							}
+
+							
+							#if 0
 							/* 只有设备类型为device才需要保存起来 */
 						//	if(ptLoginMsg->bCorD == 1)
 							{
-								T_PeerInfo tmpPeer;
-								memset(&tmpPeer, 0, sizeof(T_PeerInfo));
-								strcpy(tmpPeer.name, ptLoginMsg->name);
-								strcpy(tmpPeer.ID, ptLoginMsg->ID);
-								strcpy(tmpPeer.sLanIp, ptLoginMsg->MyLanIP);
-								tmpPeer.usLanPort = ptLoginMsg->MyLanPort;
-								strcpy(tmpPeer.sPubIp, inet_ntoa(fromAddr.sin_addr));
-								tmpPeer.usPubPort = htons(fromAddr.sin_port);
-								tmpPeer.bCorD = ptLoginMsg->bCorD;
+								strcpy(ptPeer->name, ptLoginMsg->name);
+								strcpy(ptPeer->ID, ptLoginMsg->ID);
+								strcpy(ptPeer->sLanIp, ptLoginMsg->MyLanIP);
+								ptPeer->usLanPort = ptLoginMsg->MyLanPort;
+								strcpy(ptPeer->sPubIp, inet_ntoa(fromAddr.sin_addr));
+								ptPeer->usPubPort = htons(fromAddr.sin_port);
+								ptPeer->bCorD = ptLoginMsg->bCorD;
 								
-								if(ClientList.empty()!=NULL && ClientList.size() > 0) //
+								if(ClientList.empty() != true && ClientList.size() > 0) //
 								{
 									//check if exist
 									BOOL isExist = FALSE;
@@ -127,7 +252,7 @@ void *P2PSrvProc(void *arg)
 									isExist = CheckPeerListByName(&ClientList, ptLoginMsg->name);
 									if(!isExist)
 									{
-										ClientList.push_back(&tmpPeer);			//  do not exclude same name user
+										ClientList.push_back(ptPeer);			//  do not exclude same name user
 									}
 									else
 									{
@@ -150,8 +275,7 @@ void *P2PSrvProc(void *arg)
 								else
 								{
 									//printf("new user.\n");
-									ClientList.push_back(&tmpPeer);			//  do not exclude same name user
-									
+									ClientList.push_back(ptPeer);			//  do not exclude same name user
 									T_Msg stMsgSend;
 									T_MsgLoginResp stLoginMsg;
 
@@ -168,11 +292,40 @@ void *P2PSrvProc(void *arg)
 									FTC_Sendto2(stLocal.sockSrv, (S8 *)&stMsgSend, sizeof(stMsgSend), &fromAddr);
 								}
 							}
+							#endif
 							break;
 						}
 					
 					case MSG_C_LOGOUT:
 						{
+							T_MsgLogoutReq *ptSubMsg;
+							ptSubMsg = (T_MsgLogoutReq*)stMsg.aucParam;
+							
+							strcpy(test_sql,"update p2p_peerinfo set loginstatus=0 where username=? ;");
+							db_val_t params[1];
+							params[0].type = DB_STRING;
+							params[0].val.string_val = ptSubMsg->myName;
+
+							if(sqllite_update(test_sql,params,1)==0)
+							{
+								T_Msg stMsgSend;
+								T_MsgLogoutResp stLogoutMsg;
+
+								memset(&stMsgSend, 0, sizeof(T_Msg));
+								memset(&stLogoutMsg, 0, sizeof(T_MsgLogoutResp));
+
+								stLogoutMsg.result = 0;
+
+								stMsgSend.tMsgHead.uiMsgType = MSG_TYPE_RESPONSE;
+								stMsgSend.tMsgHead.uiMsgId = MSG_R_LOGOUT;
+								stMsgSend.tMsgHead.usParaLength = sizeof(T_MsgLoginResp);
+								memcpy((T_MsgLogoutResp *)stMsgSend.aucParam, &stLogoutMsg, sizeof(stLogoutMsg));
+
+								FTC_Sendto2(stLocal.sockSrv, (S8 *)&stMsgSend, sizeof(stMsgSend), &fromAddr);
+								
+							}
+							
+							#if 0
 							T_MsgLogoutReq *ptSubMsg;
 							ptSubMsg = (T_MsgLogoutReq*)stMsg.aucParam;
 
@@ -194,12 +347,33 @@ void *P2PSrvProc(void *arg)
 							memcpy((T_MsgLogoutResp *)stMsgSend.aucParam, &stLogoutMsg, sizeof(stLogoutMsg));
 
 							FTC_Sendto2(stLocal.sockSrv, (S8 *)&stMsgSend, sizeof(stMsgSend), &fromAddr);	
-							
+							#endif
 							break;
 						}
 					
 					case MSG_C_GET_PEERS:
 						{
+							sqlite3_stmt *stmt = NULL;
+							int t_id=0,t_i=0;
+							S8 tmp_str[256]={0}; 
+		
+							strcpy(test_sql,"select id,pubipaddr,pubport,lanipaddr,lanport,username from p2p_peerinfo where devicetype=1,loginstatus=1;");	
+								
+							if(sqllite_query(test_sql,NULL,0,&stmt)!=0)
+							{
+								printf("MSG_C_GET_PEERS query err\n");
+								return -1;
+							}
+
+							do{
+								
+								PSS_DB_CPY_INT(t_id,stmt,0);
+								PSS_DB_CPY_STR(tmp_str,stmt,1);
+								printf("t_i:%d t_id:%d\n",t_i++,t_id);
+							}while(sqlite3_step(stmt) == SQLITE_ROW);
+							sqlite3_finalize(stmt);
+		
+							#if 0
 							T_MsgGetPeerListReq *ptMsgReq;
 							ptMsgReq = (T_MsgGetPeerListReq *)stMsg.aucParam;
 							
@@ -220,7 +394,8 @@ void *P2PSrvProc(void *arg)
 								stSubMsg->peerList[stSubMsg->uiPeerNums].usPubPort = (*ClientList_iter)->usPubPort;
 								strcpy(stSubMsg->peerList[stSubMsg->uiPeerNums].sLanIp, (*ClientList_iter)->sLanIp);
 								stSubMsg->peerList[stSubMsg->uiPeerNums].usLanPort = (*ClientList_iter)->usLanPort;
-
+								
+							//	printf("name:%s PubIP:%s\n",stSubMsg->peerList[stSubMsg->uiPeerNums].name,stSubMsg->peerList[stSubMsg->uiPeerNums].sPubIp);
 							//	printf("send peer list name: from:%s to:%s\n", (*ClientList_iter)->name, stSubMsg->peerList[stSubMsg->uiPeerNums].name);
 								stSubMsg->uiPeerNums++;
 							}
@@ -233,7 +408,7 @@ void *P2PSrvProc(void *arg)
 							FTC_Sendto2(stLocal.sockSrv, (S8*)&stMsgSend, sizeof(stMsgSend), &fromAddr);
 
 							printf("MSG_C_GET_PEERS FTC_Sendto2\n");
-
+							#endif
 							break;
 						}
 
@@ -408,6 +583,7 @@ void *P2PSrvProc(void *arg)
 		usleep(10000);
 	}
 
+	delete ptPeer;
 	FTC_PTHREAD_EXIT;
 }
 
@@ -415,6 +591,29 @@ int main(int argc, char* argv[])
 {
 	S32 ret;
 
+	char test_sql[256]={0};
+	ret = sqllite_init(P2P_DB_NAME,0);
+	if(ret <0)
+	{
+		printf("sqllite_init %s err\n",P2P_DB_NAME);
+		return -1;
+	}
+	else if(ret == 1)
+	{
+		printf("sqllite_init value:%d\n",ret);
+		if(initbasicdata()< 0)
+		{
+			printf("initbasicdata err 1\n");
+			return -1;
+		}
+		strcpy(test_sql,"insert into p2p_dbversion(version) values(1);");
+		if(sqllite_insert(test_sql,NULL,0,NULL,1,NULL)<0)
+		{
+			printf("initbasicdata err 1\n");
+			return -1;
+		}
+	}
+	
 	memset(&stLocal, 0, sizeof(T_LocalInfo));
 	
 	stLocal.sockSrv = FTC_CreateUdpSock(FTC_InetAddr("0.0.0.0"), FTC_Htons(SERVER_PORT));

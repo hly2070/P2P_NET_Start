@@ -164,7 +164,7 @@ void *P2PClientProc(void *arg)
 	struct sockaddr_in fromAddr;
 	T_Msg stMsg;
 	U32 mMsgID = 0;
-	T_PeerInfo tmpPeer;
+	T_PeerInfo *ptPeer = new T_PeerInfo;
 
 	memset(&fromAddr, 0, sizeof(fromAddr));
 	memset(&stMsg, 0, sizeof(T_Msg));
@@ -219,20 +219,18 @@ void *P2PClientProc(void *arg)
 							for(int i=0; i<ptSubMsg->uiPeerNums; i++)
 							{
 							//	printf("%s\n", ptSubMsg->peerList[i].name);
+							
+								strcpy(ptPeer->name, ptSubMsg->peerList[i].name);
+								strcpy(ptPeer->ID, ptSubMsg->peerList[i].ID);
+								ptPeer->bCorD = ptSubMsg->peerList[i].bCorD;
+								strcpy(ptPeer->sPubIp, ptSubMsg->peerList[i].sPubIp);
+								ptPeer->usPubPort = ptSubMsg->peerList[i].usPubPort;
+								strcpy(ptPeer->sLanIp, ptSubMsg->peerList[i].sLanIp);
+								ptPeer->usLanPort = ptSubMsg->peerList[i].usLanPort;
 								
-								memset(&tmpPeer, 0, sizeof(T_PeerInfo));
+								printf("%s\n", ptPeer->name);
 								
-								strcpy(tmpPeer.name, ptSubMsg->peerList[i].name);
-								strcpy(tmpPeer.ID, ptSubMsg->peerList[i].ID);
-								tmpPeer.bCorD = ptSubMsg->peerList[i].bCorD;
-								strcpy(tmpPeer.sPubIp, ptSubMsg->peerList[i].sPubIp);
-								tmpPeer.usPubPort = ptSubMsg->peerList[i].usPubPort;
-								strcpy(tmpPeer.sLanIp, ptSubMsg->peerList[i].sLanIp);
-								tmpPeer.usLanPort = ptSubMsg->peerList[i].usLanPort;
-								
-								printf("%s\n", tmpPeer.name);
-								
-								ClientList.push_back(&tmpPeer);
+								ClientList.push_back(ptPeer);
 							}
 						}
 						break;
@@ -388,7 +386,8 @@ void *P2PClientProc(void *arg)
 		
 		usleep(100000);
 	}
-	
+
+	delete ptPeer;
 	FTC_PTHREAD_EXIT;
 }
 

@@ -143,4 +143,35 @@ void FTC_Sleep(U32 uiMS)
 	nanosleep(&tDelayTime, &tElaspedTime);
 }
 
+int FTC_Gettimeofday(struct timeval *tp, void *tzp)
+{
+	#ifdef WIN32
+	    time_t clock;
+	    struct tm tm;
+	    SYSTEMTIME wtm;
+	#endif
+	
+	if ((NULL == tp) && (NULL == tzp))
+	{
+		return -1;
+	}
+		
+	#ifdef WIN32
+	    GetLocalTime(&wtm);
+	    tm.tm_year     = wtm.wYear - 1900;
+	    tm.tm_mon     = wtm.wMonth - 1;
+	    tm.tm_mday     = wtm.wDay;
+	    tm.tm_hour     = wtm.wHour;
+	    tm.tm_min     = wtm.wMinute;
+	    tm.tm_sec     = wtm.wSecond;
+	    tm. tm_isdst    = -1;
+	    clock = mktime(&tm);
+	    tp->tv_sec = clock;
+	    tp->tv_usec = wtm.wMilliseconds * 1000;
+	#else
+	    gettimeofday(tp, (struct timezone*)tzp);
+	#endif
+	
+	return 0;
+}
 

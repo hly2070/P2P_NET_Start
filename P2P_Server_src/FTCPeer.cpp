@@ -69,7 +69,7 @@ BOOL CheckPeerListByName(PeerList *ptPeerList, S8 *strUserName)
 		if (strcmp((*ClientList_iter)->name, strUserName) == 0)
 		{
 			isExist = TRUE;
-		//	P2P_DBG_DEBUG("find name: %s in PeerList", strUserName);
+			//P2P_DBG_DEBUG("find name: %s in PeerList", strUserName);
 			break;
 		}
 	}
